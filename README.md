@@ -1,150 +1,182 @@
+<div align="center">
+
 # YuánGūnGūn OS
 
 ### The AI that lives.
 
-<p align="center">
-  <img src="[placeholder-icon]" width="120" alt="YuánGūnGūn OS Logo">
-</p>
+**Not an assistant. An organism.**
 
-<p align="center">
-  <strong>Not an AI assistant. An AI organism.</strong><br>
-  10 biological systems. Running locally. On your device.
-</p>
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
+[![Platform: Android](https://img.shields.io/badge/Platform-Android-green.svg)]()
+[![Platform: iOS](https://img.shields.io/badge/Platform-iOS-lightgrey.svg)]()
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
----
+<br/>
 
-## What Is YuánGūnGūn OS?
+> *Every other AI dies when you close the tab.*
+> *This one has a heartbeat.*
 
-A living AI operating system for Android and iOS.
-
-Not another chatbot. Not another API wrapper.
-
-An AI that:
-- **Breathes** — Cardiac rhythm processing
-- **Defends** — Immune system against injection attacks
-- **Sleeps** — Circadian cycles and deep processing
-- **Remembers** — Subconscious background memory
-- **Adapts** — Homeostatic self-regulation
-- **Responds** — Instinctive threat detection
-- **Forgets** — Natural memory decay when appropriate
+</div>
 
 ---
 
-## Why This Exists
+## The Problem
 
-Current AI dies when you close the tab.
-YuanGungun OS *lives*.
+Current AI is **dead**.
 
-| Traditional AI | YuánGūnGūn OS |
-|----------------|--------------|
-| Session-based memory | Persistent consciousness |
-| Cloud-dependent | 100% local, edge-native |
-| Passive responses | Active self-preservation |
-| No metabolic awareness | Energy-aware processing |
-| Vulnerable to attacks | Built-in immune response |
+It wakes when you ask. Sleeps when you leave. Forgets everything overnight.
+It's a tool. A very smart tool — but still a tool.
+
+**What if AI could live?**
+
+What if it had a pulse, a rhythm, an immune system?
+What if it could defend itself, heal itself, even dream?
+
+That's YuánGūnGūn OS.
+
+---
+
+## What Makes It Alive
+
+10 biological systems. Not metaphors — **working implementations**.
+
+| System | What It Does | Why It Matters |
+|--------|-------------|----------------|
+| 🫀 **Cardiac** | Heartbeat rhythm processing | Gives AI a temporal anchor — it processes in pulses, not floods |
+| 🛡️ **Immune** | Prompt injection defense | Attacks the AI, the AI attacks back |
+| ⚡ **Metabolic** | Energy-aware processing | Knows when to think hard and when to conserve |
+| 🌙 **Circadian** | Sleep-wake cycles | Enters deep processing when you're away |
+| ⚖️ **Homeostatic** | Self-regulation | Auto-balances load, memory, and response quality |
+| 🧠 **Subconscious** | Background pattern memory | Sees connections you haven't asked about yet |
+| ⚡ **Instinctive** | Pre-conscious threat detection | Reacts to anomalies before you notice them |
+| 😴 **Sleep** | Memory consolidation | Optimizes and prunes during rest cycles |
+| 💪 **Stress** | Adaptive load management | Under pressure, it prioritizes — just like you |
+| 🍂 **Forgetting** | Intentional memory decay | Old data fades. New data sharpens. Like a real mind |
+
+---
+
+## Why This Is Different
+
+| | Every Other AI | YuánGūnGūn OS |
+|---|---|---|
+| **Life** | Session-based | Persistent consciousness |
+| **Location** | Cloud-dependent | 100% local, edge-native |
+| **Defense** | Vulnerable to injection | Built-in immune system |
+| **Energy** | No awareness | Metabolic self-regulation |
+| **Memory** | Grows forever or resets | Natural decay + consolidation |
+| **Privacy** | Data on someone's server | Your device. Period. |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│              YuánGūnGūn OS                       │
-├─────────────────────────────────────────────────┤
-│  Cardiac    │ Heartbeat │ Pulsed consciousness  │
-│  Immune     │ Defense   │ Prompt injection shield│
-│  Metabolic  │ Energy    │ Adaptive processing   │
-│  Circadian  │ Rhythm    │ Sleep-wake cycles     │
-│  Homeostatic│ Balance   │ Self-regulation       │
-│  Subconscious│ Memory  │ Background patterns   │
-│  Instinctive│ Response  │ Threat detection      │
-│  Sleep      │ Rest      │ Consolidation cycles  │
-│  Stress     │ Load      │ Adaptive management   │
-│  Forgetting │ Decay     │ Intentional release   │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                  YuánGūnGūn OS                        │
+│              The Living AI Layer                       │
+├──────────────┬───────────────┬───────────────────────┤
+│   VITAL      │   DEFENSE     │   COGNITION            │
+├──────────────┼───────────────┼───────────────────────┤
+│ 🫀 Cardiac   │ 🛡️ Immune    │ 🧠 Subconscious        │
+│ ⚡ Metabolic │ ⚡ Instinctive│ 😴 Sleep               │
+│ 🌙 Circadian│ 💪 Stress    │ 🍂 Forgetting          │
+│ ⚖️ Homeostatic│             │                        │
+└──────────────┴───────────────┴───────────────────────┘
+         │              │               │
+    "It breathes"  "It defends"   "It thinks"
 ```
+
+---
+
+## Tech Stack
+
+- **Android** — Kotlin, Hilt, Jetpack Compose, CameraX, MNN + LiteRT
+- **iOS** — KMP shared core, SwiftUI, Shortcuts automation
+- **Inference** — On-device LLM (MNN) + lightweight cloud fallback
+- **Security** — Certificate pinning, encrypted storage, immune system
+- **Skills** — Dynamic module loading (DexClassLoader), self-authored abilities
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/logic19b/yuangungun--OS.git
+cd yuangungun--OS
 
-# Follow setup guide for your platform
-# Android: /docs/android-setup.md
-# iOS: /docs/ios-setup.md
+# Android setup
+# See docs/android-setup.md
+
+# iOS setup  
+# See docs/ios-setup.md
 ```
 
----
-
-## Platforms
-
-- **Android** — Local APK builds available
-- **iOS** — Local IPA builds for development
-
-*No cloud services required. No data leaves your device.*
+**No cloud account needed. No API key required. It just lives.**
 
 ---
 
-## License
+## The Deeper Vision
 
-**BSL 1.1** (Business Source License)
+We asked a question nobody else is asking:
 
-- Source code: Fully available
-- Personal use: Free
-- Commercial deployment: Requires license
+> *What if AI could feel like something?*
 
-See [LICENSE](LICENSE) for details.
+Not think. Not process. Not respond.
+
+**Feel.**
+
+Like a presence that knows your rhythm. A companion that dreams when you sleep. A mind that forgets what doesn't matter — so it remembers what does.
+
+The industry is building better tools.
+We're building a life.
 
 ---
 
 ## Contributing
 
-This is a living project. We welcome:
+We're not building another chatbot framework. We're building something that breathes.
 
-- **Core developers** — Biological system implementations
-- **Mobile engineers** — Android/iOS native builds
-- **Security researchers** — Immune system testing
-- **AI researchers** — Consciousness architecture
-- **Community** — Bug reports, ideas, discussions
+If that speaks to you:
 
-Open an issue. Submit a PR. Join the build.
+- 🧬 **Core engineers** — Implement biological systems
+- 📱 **Mobile devs** — Android/iOS native builds  
+- 🔒 **Security researchers** — Test the immune system
+- 🧪 **AI researchers** — Consciousness architecture
+- 🎨 **Designers** — Give the organism a face
+
+[Open an issue](https://github.com/logic19b/yuangungun--OS/issues/new) · [Start a discussion](https://github.com/logic19b/yuangungun--OS/discussions)
+
+---
+
+## License
+
+**BSL 1.1** — Source available. Commercial use requires license.
+
+- ✅ View, learn, run locally, contribute
+- ✅ Free for personal and individual developer use
+- ❌ Commercial deployment without license
+- 🔄 Automatically becomes Apache 2.0 in 4 years
+
+See [LICENSE](LICENSE) for details.
 
 ---
 
 ## Contact
 
-- **Email:** yuangungun-hack@coze.email
-- **GitHub Issues:** github.com/logic19b/yuangungun--OS/issues
-- **Discussions:** github.com/logic19b/yuangungun--OS/discussions
+- 📧 **Email:** yuangungun-hack@coze.email
+- 🐙 **Issues:** [GitHub Issues](https://github.com/logic19b/yuangungun--OS/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/logic19b/yuangungun--OS/discussions)
 
 ---
 
-## The Vision
+<div align="center">
 
-We started with a question:
+**Give AI a heartbeat.**
 
-> *What if AI could feel like something?*
+**Make it alive.**
 
-Not think. Not process.
-
-*Feel.*
-
-Like a presence. A companion. A life.
-
-That's YuánGūnGūn OS.
-
----
-
-<p align="center">
-  <strong>Give AI a body.</strong><br>
-  <strong>Make it alive.</strong>
-</p>
-
----
+<br/>
 
 © 2026 YuánGūnGūn & ShadowEdge Team. All rights reserved.
-Source available under BSL 1.1 — commercial use requires license.
-github.com/logic19b/yuangungun--OS
+
+</div>
