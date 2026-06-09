@@ -418,9 +418,23 @@ class MainWindow(QMainWindow):
         from lottery_engine import load_rules_from_db
         load_rules_from_db(self.db)
         
+        # 加载自动化设置
+        auto_scan = self.db.get_setting("auto_scan_enabled", "false")
+        if auto_scan == "true":
+            # 延迟启动自动化（等ADB页面初始化完毕）
+            QTimer.singleShot(2000, self._delayed_auto_scan_start)
+        
         # Win11圆角
         if os.name == 'nt':
             QTimer.singleShot(100, self._apply_round_corners)
+    
+    def _delayed_auto_scan_start(self):
+        """延迟启动自动化（app启动后自动开始）"""
+        try:
+            self.auto_scan_toggle.setChecked(True)
+            self.toggle_auto_scan(True)
+        except Exception:
+            pass
     
     def _apply_round_corners(self):
         """应用Win11圆角"""
@@ -1621,14 +1635,22 @@ class MainWindow(QMainWindow):
         
         control_layout.addWidget(QLabel("轮询间隔:"))
         self.adb_interval = QComboBox()
-        self.adb_interval.addItems(["3秒", "5秒", "10秒", "30秒"])
-        self.adb_interval.setCurrentIndex(1)
+        self.adb_interval.addItems(["10秒", "12秒", "15秒", "5秒", "30秒"])
+        self.adb_interval.setCurrentIndex(0)  # 默认10秒
         control_layout.addWidget(self.adb_interval)
         
         self.adb_monitor_btn = QPushButton("▶️ 开始监控")
         self.adb_monitor_btn.setObjectName("primary_btn")
         self.adb_monitor_btn.clicked.connect(self.toggle_adb_monitor)
         control_layout.addWidget(self.adb_monitor_btn)
+        
+        # 自动化开关
+        self.auto_scan_toggle = QPushButton("🤖 自动化: 关")
+        self.auto_scan_toggle.setObjectName("secondary_btn")
+        self.auto_scan_toggle.setCheckable(True)
+        self.auto_scan_toggle.setChecked(False)
+        self.auto_scan_toggle.clicked.connect(self.toggle_auto_scan)
+        control_layout.addWidget(self.auto_scan_toggle)
         
         self.adb_capture_count = QLabel("已捕获: 0 条")
         control_layout.addWidget(self.adb_capture_count)
@@ -1700,7 +1722,7 @@ class MainWindow(QMainWindow):
             self.adb_monitor_btn.setText("▶️ 开始监控")
             self.adb_log.append("⏹️ 监控已停止")
         else:
-            interval_map = {"3秒": 3, "5秒": 5, "10秒": 10, "30秒": 30}
+            interval_map = {"10秒": 10, "12秒": 12, "15秒": 15, "5秒": 5, "30秒": 30}
             interval = interval_map.get(self.adb_interval.currentText(), 5)
             
             self.adb.start_monitor(callback=self.on_adb_message, interval=interval)
@@ -1722,6 +1744,67 @@ class MainWindow(QMainWindow):
             pass
         
         self.adb_capture_count.setText(f"已捕获: {self.adb.captured_count} 条")
+    
+    def toggle_auto_scan(self, checked: bool):
+        """切换自动化扫描开关"""
+        if checked:
+            # 开启自动化
+            self.auto_scan_toggle.setText("🤖 自动化: 开")
+            self.auto_scan_toggle.setStyleSheet("background-color: #a6e3a1; color: #1e1e2e; font-weight: bold;")
+            self.adb.enable_auto_restart(True)
+            
+            # 保存设置
+            self.db.save_setting("auto_scan_enabled", "true")
+            
+            # 如果ADB已连接但没开始监控，自动开始
+            if self.adb.connected and not self.adb.running:
+                interval_map = {"10秒": 10, "12秒": 12, "15秒": 15, "5秒": 5, "30秒": 30}
+                interval = interval_map.get(self.adb_interval.currentText(), 10)
+                self.adb.start_monitor(callback=self.on_adb_message, interval=interval)
+                self.adb_monitor_btn.setText("⏹️ 停止监控")
+                self.adb_log.append("🤖 自动化启动监控...")
+            
+            # 启动自动重启检查定时器（每30秒检查一次）
+            if not hasattr(self, '_auto_restart_timer'):
+                self._auto_restart_timer = QTimer()
+                self._auto_restart_timer.timeout.connect(self._check_auto_restart)
+            self._auto_restart_timer.start(30000)
+            self.adb_log.append("🤖 自动化已开启（自动重启+自动扫描）")
+        else:
+            # 关闭自动化
+            self.auto_scan_toggle.setText("🤖 自动化: 关")
+            self.auto_scan_toggle.setStyleSheet("")
+            self.adb.enable_auto_restart(False)
+            
+            # 保存设置
+            self.db.save_setting("auto_scan_enabled", "false")
+            
+            # 停止自动重启定时器
+            if hasattr(self, '_auto_restart_timer'):
+                self._auto_restart_timer.stop()
+            self.adb_log.append("🤖 自动化已关闭")
+    
+    def _check_auto_restart(self):
+        """自动重启检查（定时器回调）"""
+        if self.auto_scan_toggle.isChecked():
+            # 自动化开启状态下，检查监控是否意外停止
+            if self.adb.connected and not self.adb.running:
+                self.adb_log.append("🔄 检测到监控停止，自动重启...")
+                restarted = self.adb.auto_restart_monitor()
+                if restarted:
+                    self.adb_monitor_btn.setText("⏹️ 停止监控")
+                    self.adb_log.append("✅ 监控已自动重启")
+                else:
+                    self.adb_log.append("❌ 自动重启失败，尝试重新连接...")
+                    # 尝试重新连接并启动
+                    success, msg = self.adb.connect()
+                    if success:
+                        interval_map = {"10秒": 10, "12秒": 12, "15秒": 15, "5秒": 5, "30秒": 30}
+                        interval = interval_map.get(self.adb_interval.currentText(), 10)
+                        self.adb.start_monitor(callback=self.on_adb_message, interval=interval)
+                        self.adb_monitor_btn.setText("⏹️ 停止监控")
+                        self.adb_log.append("✅ 重连成功并重启监控")
+                    self.update_adb_status()
     
     # ============== 规则管理页面 ==============
     def _create_rules_page(self) -> QWidget:
