@@ -837,3 +837,18 @@ class Database:
                      ('play_type_categories', json.dumps(categories, ensure_ascii=False)))
         conn.commit()
         conn.close()
+    
+    def get_setting(self, key: str, default: str = "") -> str:
+        """获取设置项"""
+        conn = self._conn()
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        conn.close()
+        return row[0] if row else default
+    
+    def save_setting(self, key: str, value: str):
+        """保存设置项"""
+        conn = self._conn()
+        conn.execute("INSERT OR REPLACE INTO settings(key, value, updated_at) VALUES(?, ?, datetime('now'))",
+                     (key, value))
+        conn.commit()
+        conn.close()
