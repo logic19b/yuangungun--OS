@@ -31,6 +31,7 @@ from PyQt5.QtGui import QFont, QColor, QPalette, QBrush, QPainter, QLinearGradie
 from database import Database
 from parser import Importer, MessageParser
 from adb_capture import ADBCapture
+from wechat_scanner import WeChatScanner
 
 
 # ── QTableWidget 扩展方法 ──
@@ -402,6 +403,7 @@ class MainWindow(QMainWindow):
         self.parser = MessageParser()
         self.importer = Importer(self.db)
         self.adb = ADBCapture()
+        self.wechat_scanner = WeChatScanner()
         
         # v5: 大额订单阈值
         self.large_order_threshold = 500
@@ -418,21 +420,45 @@ class MainWindow(QMainWindow):
         from lottery_engine import load_rules_from_db
         load_rules_from_db(self.db)
         
-        # 加载自动化设置
+        # 加载ADB自动化设置
         auto_scan = self.db.get_setting("auto_scan_enabled", "false")
         if auto_scan == "true":
-            # 延迟启动自动化（等ADB页面初始化完毕）
             QTimer.singleShot(2000, self._delayed_auto_scan_start)
+        
+        # 加载微信自动扫描设置
+        wechat_scan = self.db.get_setting("wechat_scan_enabled", "false")
+        if wechat_scan == "true":
+            QTimer.singleShot(3000, self._delayed_wechat_scan_start)
         
         # Win11圆角
         if os.name == 'nt':
             QTimer.singleShot(100, self._apply_round_corners)
     
     def _delayed_auto_scan_start(self):
-        """延迟启动自动化（app启动后自动开始）"""
+        """延迟启动ADB自动化（app启动后自动开始）"""
         try:
             self.auto_scan_toggle.setChecked(True)
             self.toggle_auto_scan(True)
+        except Exception:
+            pass
+    
+    def _delayed_wechat_scan_start(self):
+        """延迟启动微信自动扫描（app启动后自动开始）"""
+        try:
+            # 先连接微信
+            success, msg = self.wechat_scanner.init_wechat()
+            if success:
+                self.update_wechat_status()
+                self.refresh_wechat_sessions()
+                # 恢复自动扫描设置
+                interval_text = self.db.get_setting("wechat_scan_interval", "10秒")
+                idx = self.wechat_interval.findText(interval_text)
+                if idx >= 0:
+                    self.wechat_interval.setCurrentIndex(idx)
+                self.wechat_scan_toggle.setChecked(True)
+                self.toggle_wechat_scan(True)
+            else:
+                self.update_wechat_status()
         except Exception:
             pass
     
@@ -475,9 +501,10 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(self._create_orders_page())     # 1
         self.content_stack.addWidget(self._create_stats_page())      # 2
         self.content_stack.addWidget(self._create_period_page())     # 3
-        self.content_stack.addWidget(self._create_adb_page())         # 4
-        self.content_stack.addWidget(self._create_rules_page())      # 5
-        self.content_stack.addWidget(self._create_settings_page())   # 6
+        self.content_stack.addWidget(self._create_adb_page())            # 4
+        self.content_stack.addWidget(self._create_wechat_scan_page())   # 5
+        self.content_stack.addWidget(self._create_rules_page())         # 6
+        self.content_stack.addWidget(self._create_settings_page())      # 7
         
         # 状态栏
         self.status_bar = QStatusBar()
@@ -512,8 +539,9 @@ class MainWindow(QMainWindow):
             ("📊 统计分析", 2),
             ("🎯 期号管理", 3),
             ("📱 ADB监控", 4),
-            ("📜 规则管理", 5),
-            ("⚙️ 设置", 6),
+            ("🤖 微信扫描", 5),
+            ("📜 规则管理", 6),
+            ("⚙️ 设置", 7),
         ]
         
         for text, index in nav_items:
@@ -553,6 +581,8 @@ class MainWindow(QMainWindow):
             self.refresh_periods()
         elif index == 4:
             self.update_adb_status()
+        elif index == 5:
+            self.update_wechat_status()
     
     # ============== 导入页面 ==============
     def _create_import_page(self) -> QWidget:
@@ -1806,7 +1836,248 @@ class MainWindow(QMainWindow):
                         self.adb_log.append("✅ 重连成功并重启监控")
                     self.update_adb_status()
     
-    # ============== 规则管理页面 ==============
+    # ============== 微信扫描页面 ==============
+    def _create_wechat_scan_page(self) -> QWidget:
+        """微信自动扫描页面"""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(15)
+        
+        # 标题
+        title = QLabel("微信自动扫描")
+        title.setObjectName("title")
+        layout.addWidget(title)
+        
+        # 连接区域
+        conn_box = QGroupBox("微信连接")
+        conn_layout = QHBoxLayout(conn_box)
+        
+        self.wechat_status_label = QLabel("❌ 未连接")
+        self.wechat_status_label.setStyleSheet("font-weight: bold;")
+        conn_layout.addWidget(self.wechat_status_label)
+        
+        wechat_connect_btn = QPushButton("🔗 连接微信")
+        wechat_connect_btn.setObjectName("primary_btn")
+        wechat_connect_btn.clicked.connect(self.wechat_connect)
+        conn_layout.addWidget(wechat_connect_btn)
+        
+        self.wechat_version_label = QLabel("")
+        self.wechat_version_label.setStyleSheet("color: #6c7086; font-size: 11px;")
+        conn_layout.addWidget(self.wechat_version_label)
+        
+        conn_layout.addStretch()
+        layout.addWidget(conn_box)
+        
+        # 控制区域
+        ctrl_box = QGroupBox("扫描控制")
+        ctrl_layout = QHBoxLayout(ctrl_box)
+        
+        ctrl_layout.addWidget(QLabel("扫描间隔:"))
+        self.wechat_interval = QComboBox()
+        self.wechat_interval.addItems(["10秒", "12秒", "15秒", "20秒", "30秒"])
+        self.wechat_interval.setCurrentIndex(0)  # 默认10秒
+        ctrl_layout.addWidget(self.wechat_interval)
+        
+        # 自动扫描开关（核心功能键）
+        self.wechat_scan_toggle = QPushButton("🤖 自动扫描: 关")
+        self.wechat_scan_toggle.setObjectName("primary_btn")
+        self.wechat_scan_toggle.setCheckable(True)
+        self.wechat_scan_toggle.setChecked(False)
+        self.wechat_scan_toggle.clicked.connect(self.toggle_wechat_scan)
+        ctrl_layout.addWidget(self.wechat_scan_toggle)
+        
+        self.wechat_scan_count = QLabel("已扫描: 0 条")
+        ctrl_layout.addWidget(self.wechat_scan_count)
+        
+        ctrl_layout.addStretch()
+        layout.addWidget(ctrl_box)
+        
+        # 会话列表
+        sess_box = QGroupBox("当前会话")
+        sess_layout = QVBoxLayout(sess_box)
+        
+        self.wechat_session_list = QLabel("连接微信后显示会话列表")
+        self.wechat_session_list.setStyleSheet(
+            "background-color: #313244; padding: 10px; border-radius: 6px; "
+            "color: #a6adc8; font-size: 12px; line-height: 1.6;"
+        )
+        self.wechat_session_list.setWordWrap(True)
+        self.wechat_session_list.setMaximumHeight(120)
+        sess_layout.addWidget(self.wechat_session_list)
+        
+        refresh_sess_btn = QPushButton("🔄 刷新会话列表")
+        refresh_sess_btn.setObjectName("secondary_btn")
+        refresh_sess_btn.clicked.connect(self.refresh_wechat_sessions)
+        sess_layout.addWidget(refresh_sess_btn)
+        
+        layout.addWidget(sess_box)
+        
+        # 扫描日志
+        log_box = QGroupBox("扫描日志")
+        log_layout = QVBoxLayout(log_box)
+        
+        self.wechat_scan_log = QTextEdit()
+        self.wechat_scan_log.setReadOnly(True)
+        self.wechat_scan_log.setMaximumHeight(250)
+        log_layout.addWidget(self.wechat_scan_log)
+        
+        log_btn_layout = QHBoxLayout()
+        clear_log_btn = QPushButton("🗑️ 清空日志")
+        clear_log_btn.setObjectName("secondary_btn")
+        clear_log_btn.clicked.connect(self.wechat_scan_log.clear)
+        log_btn_layout.addWidget(clear_log_btn)
+        log_btn_layout.addStretch()
+        log_layout.addLayout(log_btn_layout)
+        
+        layout.addWidget(log_box)
+        
+        # 使用说明
+        info = QLabel(
+            "使用说明:\n"
+            "1. 安装wxauto4: pip install wxauto4 (免费版)\n"
+            "2. 打开微信PC客户端并登录\n"
+            "3. 点击「连接微信」\n"
+            "4. 点击「🤖 自动扫描」开关开启自动扫描\n"
+            "5. 扫描到的消息会自动导入到订单中\n\n"
+            "⚠️ 扫描期间微信窗口需保持可见，不能最小化\n"
+            "💡 Plus版(wxautox4)支持后台监听，效率更高"
+        )
+        info.setStyleSheet("background-color: #313244; padding: 15px; border-radius: 8px; line-height: 1.8; color: #a6adc8;")
+        layout.addWidget(info)
+        
+        layout.addStretch()
+        return page
+    
+    def wechat_connect(self):
+        """连接微信"""
+        success, msg = self.wechat_scanner.init_wechat()
+        self.update_wechat_status()
+        self.wechat_scan_log.append(f"{'✅' if success else '❌'} {msg}")
+        
+        if success:
+            self.refresh_wechat_sessions()
+        else:
+            QMessageBox.warning(self, "连接失败", msg)
+    
+    def update_wechat_status(self):
+        """更新微信状态显示"""
+        status = self.wechat_scanner.get_status()
+        
+        if status["available"]:
+            ver = "Plus版" if status["version"] == "plus" else "免费版"
+            self.wechat_status_label.setText(f"✅ 已连接 ({ver})")
+            self.wechat_status_label.setStyleSheet("font-weight: bold; color: #a6e3a1;")
+            self.wechat_version_label.setText(f"版本: {ver} | 会话: {status['sessions']}个")
+        else:
+            self.wechat_status_label.setText("❌ 未连接")
+            self.wechat_status_label.setStyleSheet("font-weight: bold; color: #f38ba8;")
+            self.wechat_version_label.setText("")
+        
+        self.wechat_scan_count.setText(f"已扫描: {status['scanned_count']} 条")
+    
+    def refresh_wechat_sessions(self):
+        """刷新微信会话列表"""
+        sessions = self.wechat_scanner.get_session_list()
+        if sessions:
+            # 显示会话列表，最多显示20个
+            display = sessions[:20]
+            text = "、".join(display)
+            if len(sessions) > 20:
+                text += f" ...等{len(sessions)}个会话"
+            self.wechat_session_list.setText(f"📋 {text}")
+            self.wechat_scan_log.append(f"📋 发现 {len(sessions)} 个会话")
+        else:
+            self.wechat_session_list.setText("暂无会话（请确认微信已登录）")
+        self.update_wechat_status()
+    
+    def toggle_wechat_scan(self, checked: bool):
+        """切换微信自动扫描开关"""
+        if checked:
+            if not self.wechat_scanner.is_available():
+                self.wechat_scan_toggle.setChecked(False)
+                self.wechat_scan_log.append("❌ 请先连接微信")
+                QMessageBox.warning(self, "提示", "请先连接微信PC客户端")
+                return
+            
+            # 开启自动扫描
+            self.wechat_scan_toggle.setText("🤖 自动扫描: 开")
+            self.wechat_scan_toggle.setStyleSheet("background-color: #a6e3a1; color: #1e1e2e; font-weight: bold;")
+            self.wechat_scanner.enable_auto_restart(True)
+            
+            # 保存设置
+            self.db.save_setting("wechat_scan_enabled", "true")
+            interval_text = self.wechat_interval.currentText()
+            self.db.save_setting("wechat_scan_interval", interval_text)
+            
+            # 启动扫描
+            interval_map = {"10秒": 10, "12秒": 12, "15秒": 15, "20秒": 20, "30秒": 30}
+            interval = interval_map.get(interval_text, 10)
+            self.wechat_scanner.start_scan(callback=self.on_wechat_message, interval=interval)
+            
+            # 启动自动重启检查定时器（每30秒检查一次）
+            if not hasattr(self, '_wechat_restart_timer'):
+                self._wechat_restart_timer = QTimer()
+                self._wechat_restart_timer.timeout.connect(self._check_wechat_restart)
+            self._wechat_restart_timer.start(30000)
+            
+            self.wechat_scan_log.append(f"🤖 自动扫描已开启（间隔{interval}秒）")
+        else:
+            # 关闭自动扫描
+            self.wechat_scan_toggle.setText("🤖 自动扫描: 关")
+            self.wechat_scan_toggle.setStyleSheet("")
+            self.wechat_scanner.stop_scan()
+            self.wechat_scanner.enable_auto_restart(False)
+            
+            # 保存设置
+            self.db.save_setting("wechat_scan_enabled", "false")
+            
+            # 停止自动重启定时器
+            if hasattr(self, '_wechat_restart_timer'):
+                self._wechat_restart_timer.stop()
+            
+            self.wechat_scan_log.append("🤖 自动扫描已关闭")
+    
+    def on_wechat_message(self, msg: dict):
+        """微信扫描到消息回调"""
+        group_name = msg.get('group_name', '未知')
+        nickname = msg.get('nickname', '未知')
+        content = msg.get('content', '')[:60]
+        
+        self.wechat_scan_log.append(f"[{msg.get('time','')[11:]}] {group_name} | {nickname}: {content}")
+        
+        # 自动导入到算账助手
+        try:
+            count = self.importer.import_from_text(
+                f"{nickname}: {msg.get('content', '')}",
+                group_name
+            )
+            if count > 0:
+                self.update_status_bar()
+        except:
+            pass
+        
+        self.wechat_scan_count.setText(f"已扫描: {self.wechat_scanner.scanned_count} 条")
+    
+    def _check_wechat_restart(self):
+        """自动重启检查（定时器回调）"""
+        if self.wechat_scan_toggle.isChecked():
+            if self.wechat_scanner.is_available() and not self.wechat_scanner.running:
+                self.wechat_scan_log.append("🔄 检测到扫描停止，自动重启...")
+                restarted = self.wechat_scanner.auto_restart_scan()
+                if restarted:
+                    self.wechat_scan_log.append("✅ 扫描已自动重启")
+                else:
+                    self.wechat_scan_log.append("❌ 自动重启失败，尝试重新连接...")
+                    success, msg = self.wechat_scanner.init_wechat()
+                    if success:
+                        interval_map = {"10秒": 10, "12秒": 12, "15秒": 15, "20秒": 20, "30秒": 30}
+                        interval = interval_map.get(self.wechat_interval.currentText(), 10)
+                        self.wechat_scanner.start_scan(callback=self.on_wechat_message, interval=interval)
+                        self.wechat_scan_log.append("✅ 重连成功并重启扫描")
+                    self.update_wechat_status()
+    
+        # ============== 规则管理页面 ==============
     def _create_rules_page(self) -> QWidget:
         """规则管理页面"""
         from PyQt5.QtWidgets import (QDialog, QFormLayout, QDialogButtonBox,
