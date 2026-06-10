@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
-"""算账助手 - 数据库层 v5
-新增5个功能：
+"""算账助手 - 数据库层 v7.2
+新增10个功能：
 1. P0-1: pending状态（待处理）
 2. P0-2: actual_amount字段（实下金额）
 3. P1-1: 按群分块统计
 4. P1-2: 大额订单标记
 5. P2: partial状态（部分成功）
+6. P0-1: get_amount_by_lottery_type() 按彩种统计金额
+7. P0-2: calculate_winnings() 增加play_type参数
+8. P1-1: get_statistics/get_profit_stats 增加日期范围筛选
+9. P1-2: period_id字段关联期号
+10. P2-3: 数据库恢复支持
 """
 
 import sqlite3
@@ -93,6 +98,10 @@ class Database:
         # bet_numbers: 投注号码
         if 'bet_numbers' not in existing_cols:
             c.execute("ALTER TABLE orders ADD COLUMN bet_numbers TEXT DEFAULT ''")
+        
+        # P1-2: period_id 期号关联
+        if 'period_id' not in existing_cols:
+            c.execute("ALTER TABLE orders ADD COLUMN period_id INTEGER DEFAULT 0")
         
         # 期号表
         c.execute("""CREATE TABLE IF NOT EXISTS periods (
@@ -363,12 +372,13 @@ class Database:
     # v5改造: get_orders支持pending和partial筛选
     def get_orders(self, group_name=None, status="all", keyword=None,
                    period=None, is_large=None, play_type=None,
-                   limit=500, offset=0):
+                   period_id=None, limit=500, offset=0):
         """
-        获取订单列表 v5
+        获取订单列表 v7.2
         - status支持: all/pending/success/failed/refund/void/partial
         - is_large: None=全部, 0=普通, 1=大额
         - play_type: None=全部, 指定玩法类型筛选（组六/组三/双飞/定位等）
+        - period_id: None=全部, 指定期号ID筛选
         """
         conn = self._conn()
         conds, params = [], []
@@ -394,6 +404,10 @@ class Database:
         if play_type:
             conds.append("(',' || o.play_type || ',') LIKE ?")
             params.append(f"%,{play_type},%")
+        
+        # P1-2: 期号ID筛选
+        if period_id is not None and period_id > 0:
+            conds.append("o.period_id=?"); params.append(period_id)
         
         where = " AND ".join(conds) if conds else "1=1"
 
@@ -510,11 +524,12 @@ class Database:
 
     # ── 统计 ──
     # v5改造: get_statistics增加pending/partial统计
-    def get_statistics(self, group_name=None, period=None):
+    def get_statistics(self, group_name=None, period=None, start_date=None, end_date=None):
         """
-        获取统计 v5
+        获取统计 v7.2
         新增pending（待处理）和partial（部分成功）统计
         actual_amount优先于amount用于统计（非0时）
+        start_date/end_date: 日期范围筛选（格式YYYY-MM-DD HH:MM:SS）
         """
         conn = self._conn()
         conds, params = [], []
@@ -522,6 +537,11 @@ class Database:
             conds.append("g.name=?"); params.append(group_name)
         if period:
             conds.append("o.time LIKE ?"); params.append(f"{period}%")
+        # P1-1: 日期范围筛选
+        if start_date:
+            conds.append("o.time >= ?"); params.append(start_date)
+        if end_date:
+            conds.append("o.time <= ?"); params.append(end_date + " 23:59:59")
         where = " AND ".join(conds) if conds else "1=1"
         
         # v5: 所有状态分组统计
@@ -597,14 +617,19 @@ class Database:
         conn.close()
         return result
 
-    def get_profit_stats(self, period=None, group_name=None):
-        """盈亏统计（排除作废和退码）"""
+    def get_profit_stats(self, period=None, group_name=None, start_date=None, end_date=None):
+        """盈亏统计（排除作废和退码）v7.2 支持日期范围筛选"""
         conn = self._conn()
         conds, params = ["o.status='success'"], []
         if period:
             conds.append("o.time LIKE ?"); params.append(f"{period}%")
         if group_name and group_name != "所有群":
             conds.append("g.name=?"); params.append(group_name)
+        # P1-1: 日期范围筛选
+        if start_date:
+            conds.append("o.time >= ?"); params.append(start_date)
+        if end_date:
+            conds.append("o.time <= ?"); params.append(end_date + " 23:59:59")
         where = " AND ".join(conds)
         rows = conn.execute(
             f"""SELECT o.nickname,g.name,
@@ -685,7 +710,11 @@ class Database:
         return n > 0
 
     # ── 中奖计算（使用终极全玩法引擎）──
-    def calculate_winnings(self, period=None):
+    def calculate_winnings(self, period=None, play_type=None):
+        """
+        中奖计算 v7.2
+        - play_type: 玩法类型筛选（如'组三'、'直选'等），为空则计算全部
+        """
         conn = self._conn()
         if period:
             row = conn.execute("SELECT period,lottery_type,open_code FROM periods WHERE period=?",
@@ -704,10 +733,15 @@ class Database:
             conn.close()
             return {"error": f"开奖号码格式错误: {ocode}"}
 
-        # v5: 只计算success和partial状态的订单
-        orders = conn.execute(
-            "SELECT id,nickname,content,amount,bet_numbers,prize,status FROM orders WHERE time LIKE ? AND status IN ('success', 'partial')",
-            (f"{pcode}%",)).fetchall()
+        # P0-2: 只计算success和partial状态的订单，支持玩法分类筛选
+        if play_type and play_type != "全部":
+            orders = conn.execute(
+                "SELECT id,nickname,content,amount,bet_numbers,prize,status FROM orders WHERE time LIKE ? AND status IN ('success', 'partial') AND (',' || play_type || ',') LIKE ?",
+                (f"{pcode}%", f"%,{play_type},%")).fetchall()
+        else:
+            orders = conn.execute(
+                "SELECT id,nickname,content,amount,bet_numbers,prize,status FROM orders WHERE time LIKE ? AND status IN ('success', 'partial')",
+                (f"{pcode}%",)).fetchall()
         parser = MessageParser()
         winners, losers, total_bet, total_prize = [], [], 0, 0
         for oid, nick, content, amount, bnums, prize, status in orders:
@@ -852,3 +886,43 @@ class Database:
                      (key, value))
         conn.commit()
         conn.close()
+
+    # ── P0-1: 按彩种统计金额（体彩/福彩）──
+    def get_amount_by_lottery_type(self) -> dict:
+        """
+        按彩种统计成功订单的金额
+        返回 {"体": float, "福": float}
+        用于状态栏盈亏汇总
+        """
+        conn = self._conn()
+        # 体彩（包含"体"关键词）和 福彩（包含"福"关键词）
+        rows = conn.execute("""
+            SELECT lottery_type, 
+                   COALESCE(SUM(CASE WHEN actual_amount > 0 THEN actual_amount ELSE amount END), 0) as total
+            FROM orders 
+            WHERE status = 'success'
+            GROUP BY lottery_type
+        """).fetchall()
+        conn.close()
+        
+        result = {"体": 0.0, "福": 0.0, "总": 0.0}
+        for ltype, total in rows:
+            ltype_str = str(ltype) if ltype else ""
+            if "体" in ltype_str:
+                result["体"] += total
+            elif "福" in ltype_str:
+                result["福"] += total
+            else:
+                # 默认归类
+                result["体"] += total
+            result["总"] += total
+        
+        return result
+
+    # ── P1-3: 获取所有群组名列表（用于导入页历史记录）──
+    def get_all_group_names(self) -> List[str]:
+        """获取所有群组名称列表"""
+        conn = self._conn()
+        rows = conn.execute("SELECT name FROM groups ORDER BY created_at DESC").fetchall()
+        conn.close()
+        return [r[0] for r in rows]

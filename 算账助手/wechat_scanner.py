@@ -123,31 +123,23 @@ class WeChatScanner:
             pass
         return messages
 
-    def scan_all_chats(self) -> List[Dict]:
-        """扫描全部群聊的新消息"""
+    def scan_all_chats(self, target_sessions: List[str] = None) -> List[Dict]:
+        """
+        扫描全部群聊的新消息
+        P1-4: 增加 target_sessions 参数，支持只扫描指定群聊
+        - target_sessions: None=扫描全部，否则只扫描指定的群聊名称列表
+        """
         all_messages = []
 
         if not self.wx:
             return all_messages
-
-        # Plus版: 可以用GetNextNewMessage更高效
-        if self._wx_version == 'plus':
-            try:
-                result = self.wx.GetNextNewMessage(filter_mute=False)
-                if result and isinstance(result, dict):
-                    chat_name = result.get('chat_name', '')
-                    msgs = result.get('msg', [])
-                    for msg in msgs:
-                        parsed = self._parse_message(msg, chat_name)
-                        if parsed:
-                            all_messages.append(parsed)
-                    if all_messages:
-                        return all_messages
-            except:
-                pass
-
-        # 免费版/Plus版回退: 逐个切换会话读取
-        sessions = self.get_session_list()
+        
+        # P1-4: 获取会话列表，支持过滤
+        if target_sessions:
+            sessions = target_sessions  # 只扫描指定群聊
+        else:
+            sessions = self.get_session_list()
+        
         if not sessions:
             return self.scan_current_chat()
 
@@ -230,17 +222,22 @@ class WeChatScanner:
         key = f"{msg.get('group_name', '')}|{msg.get('nickname', '')}|{msg.get('content', '')[:100]}"
         return hashlib.md5(key.encode('utf-8')).hexdigest()[:16]
 
-    def start_scan(self, callback: Callable = None, interval: int = 10):
-        """开始自动扫描"""
+    def start_scan(self, callback: Callable = None, interval: int = 10, target_sessions: List[str] = None):
+        """开始自动扫描 P1-4: 支持 target_sessions 参数"""
         if self.running:
             return
         if not self._wx_available:
             return
         self.callback = callback
         self.scan_interval = max(5, interval)
+        self._target_sessions = target_sessions  # P1-4: 保存目标群聊列表
         self.running = True
         self.scan_thread = threading.Thread(target=self._scan_loop, daemon=True)
         self.scan_thread.start()
+    
+    def _get_target_sessions(self) -> List[str]:
+        """P1-4: 获取目标群聊列表"""
+        return getattr(self, '_target_sessions', None)
 
     def stop_scan(self):
         """停止扫描"""
@@ -267,11 +264,13 @@ class WeChatScanner:
         return False
 
     def _scan_loop(self):
-        """扫描循环（带自动重启和错误退避）"""
+        """扫描循环（带自动重启和错误退避）P1-4: 支持 target_sessions"""
         consecutive_errors = 0
         while self.running:
             try:
-                messages = self.scan_all_chats()
+                # P1-4: 传入 target_sessions 参数
+                target_sessions = self._get_target_sessions()
+                messages = self.scan_all_chats(target_sessions=target_sessions)
 
                 # 去重，只处理新消息
                 new_count = 0

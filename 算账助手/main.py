@@ -597,13 +597,36 @@ class MainWindow(QMainWindow):
         title.setObjectName("title")
         layout.addWidget(title)
         
-        # 群名输入
+        # 群名输入 - P1-3: 改为可编辑QComboBox（支持历史记录）
         group_layout = QHBoxLayout()
         group_layout.addWidget(QLabel("群名称:"))
-        self.group_name_input = QLineEdit()
+        self.group_name_input = QComboBox()
+        self.group_name_input.setEditable(True)
         self.group_name_input.setPlaceholderText("输入群名称，默认为'默认群'")
-        self.group_name_input.setText("默认群")
+        self.group_name_input.setCurrentText("默认群")
+        self.group_name_input.setMinimumWidth(200)
+        self.group_name_input.setStyleSheet("""
+            QComboBox {
+                background-color: #11111b;
+                border: 1px solid #45475a;
+                border-radius: 8px;
+                padding: 8px 14px;
+                color: #cdd6f4;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 30px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1e1e2e;
+                border: 1px solid #45475a;
+                selection-background-color: #89b4fa;
+            }
+        """)
         group_layout.addWidget(self.group_name_input)
+        # P1-3: 加载群名历史记录
+        self._refresh_group_name_history()
+        group_layout.addStretch()
         layout.addLayout(group_layout)
         
         # 文本框
@@ -658,13 +681,13 @@ class MainWindow(QMainWindow):
         return page
     
     def do_import(self):
-        """执行导入(异步)"""
+        """执行导入(异步) v7.2 P1-3: 使用currentText()"""
         text = self.import_text.toPlainText().strip()
         if not text:
             QMessageBox.warning(self, "提示", "请输入聊天记录内容")
             return
         
-        group_name = self.group_name_input.text().strip() or "默认群"
+        group_name = self.group_name_input.currentText().strip() or "默认群"
         
         # 显示进度条
         self.import_progress.setVisible(True)
@@ -686,7 +709,7 @@ class MainWindow(QMainWindow):
         self.import_result.setText(f"⏳ {message}")
     
     def _on_import_finished(self, count, group_name):
-        """导入完成回调"""
+        """导入完成回调 v7.2: 刷新群名历史记录"""
         self.import_progress.setVisible(False)
         
         # v5: 导入后自动标记大额订单
@@ -695,6 +718,10 @@ class MainWindow(QMainWindow):
         
         self.import_result.setText(f"✅ 成功导入 {count} 条记录")
         self.import_text.clear()
+        
+        # P1-3: 导入成功后刷新群名历史记录
+        self._refresh_group_name_history()
+        
         self.update_status_bar()
         
         # Windows通知
@@ -708,14 +735,47 @@ class MainWindow(QMainWindow):
         self.import_progress.setVisible(False)
         self.import_result.setText(f"❌ 导入失败")
         QMessageBox.critical(self, "错误", f"导入失败: {error_msg}")
+
+    def _refresh_group_name_history(self):
+        """P1-3: 刷新群名历史记录下拉列表"""
+        if not hasattr(self, 'group_name_input'):
+            return
+        # 从数据库加载已有群名
+        try:
+            group_names = self.db.get_all_group_names()
+            # 确保"默认群"在列表中
+            if "默认群" not in group_names:
+                group_names.insert(0, "默认群")
+            # 去重
+            seen = set()
+            unique_names = []
+            for g in group_names:
+                if g not in seen:
+                    seen.add(g)
+                    unique_names.append(g)
+            
+            # 更新下拉列表
+            self.group_name_input.blockSignals(True)
+            current = self.group_name_input.currentText()
+            self.group_name_input.clear()
+            self.group_name_input.addItems(unique_names)
+            # 恢复当前选择
+            idx = self.group_name_input.findText(current)
+            if idx >= 0:
+                self.group_name_input.setCurrentIndex(idx)
+            else:
+                self.group_name_input.setCurrentText(current)
+            self.group_name_input.blockSignals(False)
+        except Exception:
+            pass
     
     def import_file(self):
-        """从文件导入(异步)"""
+        """从文件导入(异步) v7.2 P1-3: 使用currentText()"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择文件", "", "文本文件 (*.txt *.log);;所有文件 (*)"
         )
         if file_path:
-            group_name = self.group_name_input.text().strip() or None
+            group_name = self.group_name_input.currentText().strip() or None
             
             # 显示进度条
             self.import_progress.setVisible(True)
@@ -800,6 +860,13 @@ class MainWindow(QMainWindow):
         self.order_type_filter.currentIndexChanged.connect(self.refresh_orders)
         filter_layout.addWidget(self.order_type_filter)
         
+        # P1-2: 期号筛选
+        filter_layout.addWidget(QLabel("期号:"))
+        self.order_period_filter = QComboBox()
+        self._refresh_period_filter()  # 从periods表加载
+        self.order_period_filter.currentIndexChanged.connect(self.refresh_orders)
+        filter_layout.addWidget(self.order_period_filter)
+        
         filter_layout.addWidget(QLabel("搜索:"))
         self.order_search = QLineEdit()
         self.order_search.setPlaceholderText("搜索昵称/内容...")
@@ -878,14 +945,28 @@ class MainWindow(QMainWindow):
         if play_type_text == "未分类":
             play_type = "__uncategorized__"  # v7: 特殊标记
         
+        # P1-2: 期号ID筛选
+        period_id = None
+        if hasattr(self, 'order_period_filter'):
+            period_text = self.order_period_filter.currentText()
+            if period_text and period_text != "全部期号":
+                # 从文本中提取期号ID（格式：期号ID - 期号）
+                for idx in range(self.order_period_filter.count()):
+                    text = self.order_period_filter.itemText(idx)
+                    if text == period_text and idx > 0:
+                        period_id = idx  # 使用索引作为ID
+                        break
+                if period_id is None:
+                    period_id = 0
+        
         # 查询
         if play_type == "__uncategorized__":
             # 未分类: play_type为空
-            orders, total = self.db.get_orders(group_name=group_name, status=status, keyword=keyword, is_large=is_large, play_type=None)
+            orders, total = self.db.get_orders(group_name=group_name, status=status, keyword=keyword, is_large=is_large, play_type=None, period_id=period_id)
             orders = [o for o in orders if not o.play_type]
             total = len(orders)
         else:
-            orders, total = self.db.get_orders(group_name=group_name, status=status, keyword=keyword, is_large=is_large, play_type=play_type)
+            orders, total = self.db.get_orders(group_name=group_name, status=status, keyword=keyword, is_large=is_large, play_type=play_type, period_id=period_id)
         
         # 更新表格（v6: 新增玩法列，索引调整）
         self.orders_table.setRowCount(len(orders))
@@ -959,6 +1040,27 @@ class MainWindow(QMainWindow):
         idx = self.order_playtype_filter.findText(current)
         if idx >= 0:
             self.order_playtype_filter.setCurrentIndex(idx)
+
+    def _refresh_period_filter(self):
+        """P1-2: 从periods表加载期号到筛选下拉框"""
+        if not hasattr(self, 'order_period_filter'):
+            return
+        current = self.order_period_filter.currentText()
+        self.order_period_filter.blockSignals(True)
+        self.order_period_filter.clear()
+        self.order_period_filter.addItem("全部期号")
+        try:
+            periods = self.db.get_all_periods()
+            for p in periods:
+                display_text = f"{p['period']} ({p['lottery_type']})"
+                self.order_period_filter.addItem(display_text)
+        except Exception:
+            pass
+        # 恢复之前选中
+        idx = self.order_period_filter.findText(current)
+        if idx >= 0:
+            self.order_period_filter.setCurrentIndex(idx)
+        self.order_period_filter.blockSignals(False)
 
     def manage_play_types(self):
         """v7: 管理玩法分类对话框 - 用户可自定义增删玩法"""
@@ -1253,7 +1355,7 @@ class MainWindow(QMainWindow):
     
     # ============== 统计页面 ==============
     def _create_stats_page(self) -> QWidget:
-        """统计页面"""
+        """统计页面 v7.2 增加日期范围筛选"""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -1262,6 +1364,35 @@ class MainWindow(QMainWindow):
         title = QLabel("数据统计")
         title.setObjectName("title")
         layout.addWidget(title)
+        
+        # P1-1: 日期范围筛选
+        date_filter_layout = QHBoxLayout()
+        date_filter_layout.addWidget(QLabel("开始日期:"))
+        self.stats_start_date = QDateEdit()
+        self.stats_start_date.setCalendarPopup(True)
+        self.stats_start_date.setDate(QDate.currentDate().addMonths(-1))
+        self.stats_start_date.setDisplayFormat("yyyy-MM-dd")
+        date_filter_layout.addWidget(self.stats_start_date)
+        
+        date_filter_layout.addWidget(QLabel("结束日期:"))
+        self.stats_end_date = QDateEdit()
+        self.stats_end_date.setCalendarPopup(True)
+        self.stats_end_date.setDate(QDate.currentDate())
+        self.stats_end_date.setDisplayFormat("yyyy-MM-dd")
+        date_filter_layout.addWidget(self.stats_end_date)
+        
+        filter_btn = QPushButton("🔍 筛选")
+        filter_btn.setObjectName("primary_btn")
+        filter_btn.clicked.connect(self.refresh_stats)
+        date_filter_layout.addWidget(filter_btn)
+        
+        clear_btn = QPushButton("清除")
+        clear_btn.setObjectName("secondary_btn")
+        clear_btn.clicked.connect(self.clear_stats_filter)
+        date_filter_layout.addWidget(clear_btn)
+        
+        date_filter_layout.addStretch()
+        layout.addLayout(date_filter_layout)
         
         # 统计卡片区
         self.stats_cards = QGridLayout()
@@ -1303,11 +1434,23 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return page
     
+    def clear_stats_filter(self):
+        """P1-1: 清除日期范围筛选，恢复全部数据"""
+        if hasattr(self, 'stats_start_date'):
+            self.stats_start_date.setDate(QDate.currentDate().addMonths(-1))
+        if hasattr(self, 'stats_end_date'):
+            self.stats_end_date.setDate(QDate.currentDate())
+        self.refresh_stats()
+    
     def refresh_stats(self):
-        """刷新统计数据"""
+        """刷新统计数据 v7.2 支持日期范围筛选"""
+        # P1-1: 获取日期范围
+        start_date = self.stats_start_date.date().toString("yyyy-MM-dd") if hasattr(self, 'stats_start_date') else None
+        end_date = self.stats_end_date.date().toString("yyyy-MM-dd") if hasattr(self, 'stats_end_date') else None
+        
         # 获取统计
-        stats = self.db.get_statistics()
-        profit = self.db.get_profit_stats()
+        stats = self.db.get_statistics(start_date=start_date, end_date=end_date)
+        profit = self.db.get_profit_stats(start_date=start_date, end_date=end_date)
         
         # 清空并重建卡片
         while self.stats_cards.count():
@@ -1543,6 +1686,14 @@ class MainWindow(QMainWindow):
         calc_layout.addWidget(QLabel("选择期号:"))
         calc_layout.addWidget(self.calc_period_combo)
         
+        # P0-2: 玩法筛选下拉框
+        calc_layout.addWidget(QLabel("玩法筛选:"))
+        self.calc_playtype_combo = QComboBox()
+        self.calc_playtype_combo.addItem("全部")
+        categories = self.db.get_play_type_categories() if self.db else ["组六", "组三", "直选", "复式"]
+        self.calc_playtype_combo.addItems(categories)
+        calc_layout.addWidget(self.calc_playtype_combo)
+        
         calc_btn = QPushButton("📊 计算中奖")
         calc_btn.setObjectName("primary_btn")
         calc_btn.clicked.connect(self.calculate_winnings)
@@ -1594,12 +1745,17 @@ class MainWindow(QMainWindow):
         show_windows_notification("添加成功", f"期号 {period} 开奖号码 {code}")
     
     def calculate_winnings(self):
-        """计算中奖"""
+        """计算中奖 v7.2 支持玩法筛选"""
         period = self.calc_period_combo.currentText()
         if not period:
             return
         
-        result = self.db.calculate_winnings(period)
+        # P0-2: 获取玩法筛选
+        play_type = self.calc_playtype_combo.currentText()
+        if play_type == "全部":
+            play_type = None
+        
+        result = self.db.calculate_winnings(period, play_type=play_type)
         
         if "error" in result:
             self.period_result.setText(f"❌ {result['error']}")
@@ -1893,24 +2049,37 @@ class MainWindow(QMainWindow):
         ctrl_layout.addStretch()
         layout.addWidget(ctrl_box)
         
-        # 会话列表
-        sess_box = QGroupBox("当前会话")
+        # P1-4: 群聊选择区域
+        sess_box = QGroupBox("群聊选择（支持多选，不选则扫描全部）")
         sess_layout = QVBoxLayout(sess_box)
         
-        self.wechat_session_list = QLabel("连接微信后显示会话列表")
-        self.wechat_session_list.setStyleSheet(
-            "background-color: #313244; padding: 10px; border-radius: 6px; "
-            "color: #a6adc8; font-size: 12px; line-height: 1.6;"
-        )
-        self.wechat_session_list.setWordWrap(True)
-        self.wechat_session_list.setMaximumHeight(120)
-        sess_layout.addWidget(self.wechat_session_list)
+        # 工具栏
+        sess_toolbar = QHBoxLayout()
+        self.wechat_session_list_widget = QListWidget()
+        self.wechat_session_list_widget.setSelectionMode(QListWidget.MultiSelection)
+        self.wechat_session_list_widget.setMaximumHeight(150)
+        self.wechat_session_list_widget.setStyleSheet("""
+            QListWidget { background-color: #11111b; border: 1px solid #45475a; border-radius: 6px; padding: 5px; }
+            QListWidget::item { padding: 5px; border-radius: 4px; }
+            QListWidget::item:selected { background-color: #89b4fa; color: #1e1e2e; }
+            QListWidget::item:hover { background-color: #313244; }
+        """)
+        sess_layout.addWidget(self.wechat_session_list_widget)
         
-        refresh_sess_btn = QPushButton("🔄 刷新会话列表")
+        sess_toolbar.addWidget(QLabel("连接微信后显示群聊列表，按Ctrl/Shift多选"))
+        sess_toolbar.addStretch()
+        
+        refresh_sess_btn = QPushButton("🔄 刷新群聊")
         refresh_sess_btn.setObjectName("secondary_btn")
         refresh_sess_btn.clicked.connect(self.refresh_wechat_sessions)
-        sess_layout.addWidget(refresh_sess_btn)
+        sess_toolbar.addWidget(refresh_sess_btn)
         
+        clear_sel_btn = QPushButton("清除选择")
+        clear_sel_btn.setObjectName("secondary_btn")
+        clear_sel_btn.clicked.connect(self.clear_wechat_session_selection)
+        sess_toolbar.addWidget(clear_sel_btn)
+        
+        sess_layout.addLayout(sess_toolbar)
         layout.addWidget(sess_box)
         
         # 扫描日志
@@ -1977,19 +2146,34 @@ class MainWindow(QMainWindow):
         self.wechat_scan_count.setText(f"已扫描: {status['scanned_count']} 条")
     
     def refresh_wechat_sessions(self):
-        """刷新微信会话列表"""
+        """刷新微信会话列表 v7.2 使用QListWidget"""
         sessions = self.wechat_scanner.get_session_list()
         if sessions:
-            # 显示会话列表，最多显示20个
-            display = sessions[:20]
-            text = "、".join(display)
-            if len(sessions) > 20:
-                text += f" ...等{len(sessions)}个会话"
-            self.wechat_session_list.setText(f"📋 {text}")
+            # 更新QListWidget
+            self.wechat_session_list_widget.blockSignals(True)
+            self.wechat_session_list_widget.clear()
+            for sess in sessions:
+                self.wechat_session_list_widget.addItem(sess)
+            self.wechat_session_list_widget.blockSignals(False)
             self.wechat_scan_log.append(f"📋 发现 {len(sessions)} 个会话")
         else:
-            self.wechat_session_list.setText("暂无会话（请确认微信已登录）")
+            self.wechat_session_list_widget.clear()
+            self.wechat_scan_log.append("⚠️ 未发现会话（请确认微信已登录）")
         self.update_wechat_status()
+    
+    def clear_wechat_session_selection(self):
+        """P1-4: 清除群聊选择"""
+        if hasattr(self, 'wechat_session_list_widget'):
+            self.wechat_session_list_widget.clearSelection()
+    
+    def _get_selected_sessions(self):
+        """P1-4: 获取选中的群聊列表，不选则返回None（扫描全部）"""
+        if not hasattr(self, 'wechat_session_list_widget'):
+            return None
+        selected_items = self.wechat_session_list_widget.selectedItems()
+        if not selected_items:
+            return None  # 未选择任何群，扫描全部
+        return [item.text() for item in selected_items]
     
     def toggle_wechat_scan(self, checked: bool):
         """切换微信自动扫描开关"""
@@ -2010,10 +2194,19 @@ class MainWindow(QMainWindow):
             interval_text = self.wechat_interval.currentText()
             self.db.save_setting("wechat_scan_interval", interval_text)
             
-            # 启动扫描
+            # 启动扫描 - P1-4: 支持扫描选中群聊
             interval_map = {"10秒": 10, "12秒": 12, "15秒": 15, "20秒": 20, "30秒": 30}
             interval = interval_map.get(interval_text, 10)
-            self.wechat_scanner.start_scan(callback=self.on_wechat_message, interval=interval)
+            
+            # P1-4: 获取选中的群聊
+            target_sessions = self._get_selected_sessions()
+            if target_sessions:
+                self.wechat_scan_log.append(f"🎯 将扫描选中的 {len(target_sessions)} 个群聊")
+            else:
+                self.wechat_scan_log.append("📋 将扫描全部会话")
+            
+            # 启动扫描（支持target_sessions参数）
+            self.wechat_scanner.start_scan(callback=self.on_wechat_message, interval=interval, target_sessions=target_sessions)
             
             # 启动自动重启检查定时器（每30秒检查一次）
             if not hasattr(self, '_wechat_restart_timer'):
@@ -2098,13 +2291,21 @@ class MainWindow(QMainWindow):
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        # ── 分类筛选 + 操作按钮 ──
+        # ── 分类筛选 + 搜索 + 操作按钮 ──
         top_bar = QHBoxLayout()
         top_bar.addWidget(QLabel("分类:"))
         self.rules_cat_filter = QComboBox()
         self.rules_cat_filter.addItem("全部")
         self.rules_cat_filter.currentTextChanged.connect(self._filter_rules_table)
         top_bar.addWidget(self.rules_cat_filter)
+        
+        # P2-1: 搜索框
+        top_bar.addWidget(QLabel("搜索:"))
+        self.rules_search_input = QLineEdit()
+        self.rules_search_input.setPlaceholderText("搜索玩法名/分类/备注...")
+        self.rules_search_input.textChanged.connect(self._search_rules)
+        self.rules_search_input.setMaximumWidth(200)
+        top_bar.addWidget(self.rules_search_input)
 
         apply_btn = QPushButton("✅ 应用规则")
         apply_btn.setObjectName("primary_btn")
@@ -2238,13 +2439,33 @@ class MainWindow(QMainWindow):
             self.rules_table.setItem(i, 7, QTableWidgetItem(r.get("remark", "")))
 
     def _filter_rules_table(self, category):
-        """按分类筛选规则表格"""
+        """按分类筛选规则表格 v7.2 结合搜索"""
+        # 获取搜索关键词
+        search_text = self.rules_search_input.text().lower() if hasattr(self, 'rules_search_input') else ""
         for i in range(self.rules_table.rowCount()):
             cat_item = self.rules_table.item(i, 1)
-            if category == "全部" or (cat_item and cat_item.text() == category):
+            pt_item = self.rules_table.item(i, 0)
+            remark_item = self.rules_table.item(i, 7)
+            
+            # 分类筛选
+            cat_match = category == "全部" or (cat_item and cat_item.text() == category)
+            
+            # 搜索筛选（匹配玩法名/分类/备注）
+            search_match = not search_text
+            if search_text:
+                pt_text = pt_item.text().lower() if pt_item else ""
+                cat_text = cat_item.text().lower() if cat_item else ""
+                remark_text = remark_item.text().lower() if remark_item else ""
+                search_match = search_text in pt_text or search_text in cat_text or search_text in remark_text
+            
+            if cat_match and search_match:
                 self.rules_table.setRowHidden(i, False)
             else:
                 self.rules_table.setRowHidden(i, True)
+    
+    def _search_rules(self, text):
+        """P2-1: 实时搜索过滤规则表格"""
+        self._filter_rules_table(self.rules_cat_filter.currentText())
 
     def _apply_rules(self):
         """将数据库中的规则加载到引擎"""
@@ -2466,7 +2687,7 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(large_box)
         
-        # 数据目录
+        # 数据存储
         data_box = QGroupBox("数据存储")
         data_layout = QVBoxLayout(data_box)
         
@@ -2477,12 +2698,64 @@ class MainWindow(QMainWindow):
         export_btn.clicked.connect(self.export_database)
         data_layout.addWidget(export_btn)
         
+        # P2-2: 数据恢复
+        import_btn = QPushButton("📥 恢复数据库")
+        import_btn.setObjectName("secondary_btn")
+        import_btn.clicked.connect(self.import_database)
+        data_layout.addWidget(import_btn)
+        
         layout.addWidget(data_box)
+        
+        # P2-2: 导出格式设置
+        export_format_box = QGroupBox("📋 导出格式设置")
+        export_format_layout = QVBoxLayout(export_format_box)
+        
+        format_layout = QHBoxLayout()
+        format_layout.addWidget(QLabel("默认导出格式:"))
+        self.export_format_combo = QComboBox()
+        self.export_format_combo.addItems(["CSV", "Excel", "JSON"])
+        # 从设置中加载默认格式
+        saved_format = self.db.get_setting("default_export_format", "CSV")
+        idx = self.export_format_combo.findText(saved_format)
+        if idx >= 0:
+            self.export_format_combo.setCurrentIndex(idx)
+        self.export_format_combo.currentTextChanged.connect(self._on_export_format_changed)
+        format_layout.addWidget(self.export_format_combo)
+        format_layout.addStretch()
+        export_format_layout.addLayout(format_layout)
+        
+        export_format_hint = QLabel("💡 导出订单数据时的默认文件格式")
+        export_format_hint.setStyleSheet("color: #6c7086; font-size: 11px;")
+        export_format_layout.addWidget(export_format_hint)
+        
+        layout.addWidget(export_format_box)
+        
+        # P2-2: 界面设置
+        ui_box = QGroupBox("🎨 界面设置")
+        ui_layout = QVBoxLayout(ui_box)
+        
+        font_layout = QHBoxLayout()
+        font_layout.addWidget(QLabel("字体大小:"))
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setRange(10, 18)
+        self.font_size_spin.setValue(13)  # 默认值
+        self.font_size_spin.setSuffix(" px")
+        self.font_size_spin.valueChanged.connect(self.on_font_size_changed)
+        font_layout.addWidget(self.font_size_spin)
+        
+        reset_font_btn = QPushButton("恢复默认")
+        reset_font_btn.setObjectName("secondary_btn")
+        reset_font_btn.clicked.connect(lambda: self.font_size_spin.setValue(13))
+        font_layout.addWidget(reset_font_btn)
+        font_layout.addStretch()
+        ui_layout.addLayout(font_layout)
+        
+        layout.addWidget(ui_box)
         
         # 关于
         about_box = QGroupBox("关于")
         about_layout = QVBoxLayout(about_box)
-        about_layout.addWidget(QLabel("算账助手 v1.0"))
+        about_layout.addWidget(QLabel("算账助手 v7.2"))
         about_layout.addWidget(QLabel("微信群账目统计系统"))
         about_layout.addWidget(QLabel("基于PyQt5构建，Windows 11优化版"))
         layout.addWidget(about_box)
@@ -2516,6 +2789,53 @@ class MainWindow(QMainWindow):
             import shutil
             shutil.copy2(self.db.db_path, save_path)
             show_windows_notification("导出成功", f"数据库已保存到: {save_path}")
+    
+    # P2-3: 恢复数据库
+    def import_database(self):
+        """从备份文件恢复数据库"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择数据库备份", "",
+            "SQLite数据库 (*.db);;所有文件 (*)"
+        )
+        if file_path:
+            reply = QMessageBox.question(
+                self, "确认恢复",
+                "⚠️ 恢复操作将替换当前数据库！\n当前数据将被备份到当前数据库路径。\n\n确定要继续吗？",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                try:
+                    import shutil
+                    # 先备份当前数据库
+                    backup_path = self.db.db_path + ".bak"
+                    shutil.copy2(self.db.db_path, backup_path)
+                    # 替换数据库
+                    shutil.copy2(file_path, self.db.db_path)
+                    show_windows_notification("恢复成功", f"数据库已从备份恢复\n备份已保存到: {backup_path}")
+                    QMessageBox.information(self, "恢复成功", f"✅ 数据库已恢复\n备份已保存到: {backup_path}\n\n请重启程序以加载新数据库")
+                except Exception as e:
+                    QMessageBox.critical(self, "恢复失败", f"❌ 恢复失败: {str(e)}")
+    
+    # P2-2: 导出格式变更
+    def _on_export_format_changed(self, format_text):
+        """保存导出格式设置"""
+        self.db.save_setting("default_export_format", format_text)
+    
+    # P2-2: 字体大小变更
+    def on_font_size_changed(self, value):
+        """更新全局字体大小"""
+        # 保存设置
+        self.db.save_setting("font_size", str(value))
+        # 更新样式
+        new_style = f"""
+        QWidget {{
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            font-size: {value}px;
+        }}
+        """
+        self.setStyleSheet(new_style)
     
     # ============== 系统托盘 ==============
     def init_tray(self):
@@ -2568,7 +2888,7 @@ class MainWindow(QMainWindow):
         self.hide_to_tray()
     
     def update_status_bar(self):
-        """更新状态栏"""
+        """更新状态栏 v7.2 增加体彩/福彩分类统计"""
         stats = self.db.get_statistics()
         void_info = ""
         if stats.get("void", 0) > 0:
@@ -2582,7 +2902,20 @@ class MainWindow(QMainWindow):
         partial_info = ""
         if stats.get("partial", 0) > 0:
             partial_info = f" | 🎯部分成功: {stats['partial']}"
-        msg = f"总订单: {stats['total']} | 有效: {stats.get('effective', stats['total'])} | 成功: {stats['success']} | 失败: {stats['failed']}{pending_info}{partial_info}{void_info} | 盈亏: ¥{stats.get('profit', 0):.2f}"
+        
+        # P0-1: 按彩种统计体彩/福彩金额
+        try:
+            lottery_stats = self.db.get_amount_by_lottery_type()
+            total_bet = lottery_stats.get("总", stats.get("profit", 0))
+            ti_amount = lottery_stats.get("体", 0.0)
+            fu_amount = lottery_stats.get("福", 0.0)
+            # 盈亏计算（简化：成功金额即为下注额）
+            profit = total_bet
+            lottery_info = f" | 💰总下注: ¥{total_bet:.2f} | 体: ¥{ti_amount:.2f} | 福: ¥{fu_amount:.2f} | 盈亏: ¥{profit:.2f}"
+        except Exception:
+            lottery_info = f" | 盈亏: ¥{stats.get('profit', 0):.2f}"
+        
+        msg = f"总订单: {stats['total']} | 有效: {stats.get('effective', stats['total'])} | 成功: {stats['success']} | 失败: {stats['failed']}{pending_info}{partial_info}{void_info}{lottery_info}"
         self.status_bar.showMessage(msg)
 
 
