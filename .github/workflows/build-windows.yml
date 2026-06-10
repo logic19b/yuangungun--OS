@@ -1,0 +1,65 @@
+name: Build Windows Installer
+
+on:
+  push:
+    paths:
+      - '算账助手/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        architecture: 'x64'
+    
+    - name: Install dependencies
+      run: |
+        cd 算账助手
+        pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Build with PyInstaller
+      run: |
+        cd 算账助手
+        pyinstaller suanshou.spec --noconfirm
+    
+    - name: Verify output
+      run: |
+        cd 算账助手
+        if (Test-Path "dist/算账助手/算账助手.exe") {
+          Write-Host "Build successful!"
+          Get-Item "dist/算账助手/算账助手.exe" | Select-Object Name, Length, LastWriteTime
+        } else {
+          Write-Error "Build failed: exe not found"
+          exit 1
+        }
+    
+    - name: Install Inno Setup
+      run: |
+        choco install innosetup -y
+    
+    - name: Build installer
+      run: |
+        cd 算账助手
+        iscc installer.iss
+    
+    - name: Upload installer artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 算账助手_v8_Windows_Installer
+        path: 算账助手/installer_output/算账助手_v8_Setup.exe
+    
+    - name: Upload portable artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 算账助手_v8_Windows_Portable
+        path: 算账助手/dist/算账助手/
