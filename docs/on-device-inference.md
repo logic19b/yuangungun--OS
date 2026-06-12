@@ -49,6 +49,77 @@
 | **Core ML** | iOS | Native Apple silicon acceleration |
 | **ONNX Runtime** | Cross-platform | Fallback option |
 
+## Quantization Support
+
+Models are quantized to reduce memory footprint and improve inference speed.
+
+### Quantization Levels
+
+| Level | Precision | Memory Reduction | Quality Loss |
+|-------|-----------|------------------|--------------|
+| **FP16** | 16-bit float | 50% | Minimal |
+| **INT8** | 8-bit integer | 75% | Low |
+| **INT4** | 4-bit integer | 87.5% | Moderate |
+| **Mixed** | Dynamic | 60-80% | Low |
+
+### Quantized Model Loading
+
+```kotlin
+class QuantizedModelLoader {
+    suspend fun loadQuantized(
+        modelSpec: ModelSpec,
+        precision: QuantPrecision = QuantPrecision.INT8
+    ): InferenceModel {
+        val quantizedPath = resolveQuantizedPath(modelSpec, precision)
+        return runtime.load(quantizedPath)
+    }
+}
+```
+
+## Speculative Decoding
+
+Accelerate inference using a small draft model to predict tokens in parallel.
+
+### Architecture
+
+```
+┌──────────────────┐
+│   Prompt Input   │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐     ┌──────────────────┐
+│  Draft Model     │────▶│  Verify Tokens   │
+│  (4B params)     │     │  (speculative)   │
+└──────────────────┘     └────────┬─────────┘
+                                  │
+         ┌────────────────────────┘
+         ▼
+┌──────────────────┐
+│  Target Model    │
+│  (7B+ params)    │──▶ Final Output
+└──────────────────┘
+```
+
+### Speedup Metrics
+
+- **2-3x faster** token generation on multi-core devices
+- **Maintains quality** — identical outputs to autoregressive decoding
+- **Energy efficient** — fewer compute cycles overall
+
+```kotlin
+class SpeculativeDecoder(
+    private val draftModel: InferenceModel,
+    private val targetModel: InferenceModel,
+    private val maxDraftTokens: Int = 4
+) {
+    suspend fun decode(input: String): TokenStream {
+        val drafts = draftModel.generate(input, maxDraftTokens)
+        return targetModel.verify(drafts)
+    }
+}
+```
+
 ## Model Management
 
 ### Model Registry
@@ -87,6 +158,18 @@ class ModelLoader {
 }
 ```
 
+### Version Management
+
+```kotlin
+data class ModelVersion(
+    val id: String,
+    val version: String,
+    val checksum: String,
+    val quantization: QuantPrecision,
+    val downloadUrl: String? = null  // For OTA updates
+)
+```
+
 ## Memory Management
 
 ### Streaming Inference
@@ -111,6 +194,40 @@ class MemoryManager {
                model.lastUsed().isBefore(now() - 15.minutes)
     }
 }
+```
+
+### Memory Pressure Response
+
+```kotlin
+sealed class MemoryPressure {
+    object Low : MemoryPressure()      // Normal operation
+    object Medium : MemoryPressure()    // Pause background tasks
+    object High : MemoryPressure()      // Unload idle models
+    object Critical : MemoryPressure()  // Emergency unloading
+}
+```
+
+## Local RAG Integration
+
+On-device retrieval-augmented generation for context-aware inference.
+
+### Vector Storage
+
+```kotlin
+class LocalVectorStore(
+    private val dimension: Int = 384,
+    private val maxEntries: Int = 10000
+) {
+    suspend fun add(embedding: FloatArray, metadata: Map<String, String>)
+    suspend fun search(query: FloatArray, topK: Int): List<SearchResult>
+    suspend fun delete(id: String)
+}
+```
+
+### RAG Pipeline
+
+```
+Query → Embed → Search → Context → LLM → Response
 ```
 
 ## Security Model
