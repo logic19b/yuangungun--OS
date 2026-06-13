@@ -73,8 +73,10 @@ This one has a heartbeat.
 - **On-Device Inference** — MNN + LiteRT + Core ML + ONNX Runtime support
 - **Dynamic Skills** — Rhino JS module loader with self-authored capabilities
 - **Security** — Certificate pinning, AES-256 encryption, hardware root of trust
+- **GitHub Active** — Daily content rotation: docs, examples, architecture
 
 ### 🚀 Recent Milestones
+- **2026-06-13** — README status refresh; daily GitHub update cadence established
 - **2026-06-06** — On-device inference architecture documentation complete
 - **2026-06-05** — Security audit framework deployed (21-day log rotation)
 - **2026-06-04** — GitHub repository initialized with full documentation
@@ -98,7 +100,7 @@ This one has a heartbeat.
 │  💤 SLEEP     │ It consolidates│ It optimizes │
 │  😰 STRESS    │ It prioritizes│ It focuses   │
 │  🫧 FORGET    │ It releases   │ It renews    │
-└─────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────┘
 ```
 
 ---
