@@ -1,11 +1,14 @@
 # Privacy Whitepaper
+
 ## The Core Promise
 **Your data never leaves your device.**
 
 This isn't a privacy policy full of legal loopholes. It's an architectural fact.
 
 ---
+
 ## Why "Privacy Promises" Aren't Enough
+
 | Claim | Reality |
 |-------|---------|
 | "We don't sell your data" | They use it to train models |
@@ -16,49 +19,47 @@ This isn't a privacy policy full of legal loopholes. It's an architectural fact.
 If your data is on their servers, you're trusting them. If your data is on your device, you don't need to trust anyone.
 
 ---
+
 ## Verifiable Privacy
+
 ### Local-First Architecture
-- LLM inference runs locally via MNN
-- Memory stored in EncryptedSharedPreferences (Android) / Keychain (iOS)
-- No telemetry, no analytics, no crash reporting
+- **LLM inference** runs locally via MNN
+- **Memory stored** in EncryptedSharedPreferences (Android) / Keychain (iOS)
+- **No telemetry**, no analytics, no crash reporting
 
 ### Encrypted Storage
-- Memory: XOR + Base64 (key = 0xAA)
-- Financial data: Separate XOR (key = 0xBB)
-- API keys: EncryptedSharedPreferences
-- Certificate pinning prevents MITM
+- **Memory**: XOR + Base64 (key = 0xAA)
+- **Financial data**: Separate XOR (key = 0xBB)
+- **API keys**: EncryptedSharedPreferences
+- **Certificate pinning** prevents MITM
 
 ### Network Isolation
 Network requests only for:
-- Cloud inference fallback: Only query text, no context/history
-- Model downloads: User-triggered only
+- **Cloud inference fallback**: Only query text, no context/history
+- **Model downloads**: User-triggered only
 
 All traffic: HTTPS + certificate pinning + encrypted keys.
 
 ### The Immune System
-- Monitors outputs for sensitive patterns
-- Blocks data extraction attempts
-- Isolates suspicious interactions
+- **Monitors outputs** for sensitive patterns
+- **Blocks data extraction attempts**
+- **Isolates suspicious interactions**
 
 ---
+
 ## Threat Model
+
 ### Attack Surface
-```
-┌─────────────────────────────────────────────────────┐
-│                    Device Layer                      │
-│  ┌─────────┐  ┌─────────┐  ┌─────────────────────┐ │
-│  │ Storage │  │  Model  │  │   Network Stack     │ │
-│  │ AES-256│  │  MNN    │  │   TLS 1.3 + Pinning │ │
-│  └─────────┘  └─────────┘  └─────────────────────┘ │
-└─────────────────────────────────────────────────────┘
-                       │
-              ┌────────▼────────┐
-              │  Immune System  │
-              │  Pattern Block  │
-              └─────────────────┘
-```
+
+| Layer | Protection |
+|-------|------------|
+| Device | Immune System, Pattern Block |
+| Storage | AES-256, XOR+Base64 |
+| Model | MNN Local Inference |
+| Network | TLS 1.3 + Pinning |
 
 ### Threat Vectors Mitigated
+
 | Threat | Mitigation |
 |--------|------------|
 | Memory dump | Encrypted storage, Keychain isolation |
@@ -68,7 +69,9 @@ All traffic: HTTPS + certificate pinning + encrypted keys.
 | Side-channel attacks | No external telemetry |
 
 ---
+
 ## Permissions Model
+
 ### Minimal Footprint
 YuánGūnGūn OS requests only what's necessary:
 
@@ -85,7 +88,9 @@ YuánGūnGūn OS requests only what's necessary:
 - No background data collection
 
 ---
+
 ## Data Rights
+
 ### You Own Everything
 - **Export**: All your data in portable JSON format
 - **Delete**: Complete wipe with single tap
@@ -99,14 +104,17 @@ YuánGūnGūn OS requests only what's necessary:
 4. Provide your data to third parties
 
 ---
+
 ## Incident Response
+
 ### Security Disclosure
-Found a vulnerability? 
+Found a vulnerability?
+
 ```
 Email: security@yuangungun.os
-PGP: Available on request
+PGP:   Available on request
 Response time: 24-48 hours
-Bounty: Vulnerability rewards program (coming Q3 2026)
+Bounty: Vulnerability reward program (coming Q3 2026)
 ```
 
 ### Zero-Knowledge Architecture
@@ -116,9 +124,11 @@ Even if we're subpoenaed, we can only provide:
 - Your encrypted blob (without your device key)
 
 ---
+
 ## Cloud AI vs YuánGūnGūn OS
+
 | | Cloud AI | YuánGūnGūn OS |
-|---|---|---|
+|--|---------|--------------|
 | Chat history | Server-side | Device-only |
 | Model training | Your data may be used | Never |
 | Encryption keys | Company holds | You hold |
@@ -126,7 +136,9 @@ Even if we're subpoenaed, we can only provide:
 | Auditability | Trust-based | Architecture-verified |
 
 ---
+
 ## Security Hardening
+
 ### Android
 - SafetyNet / Play Integrity API
 - Hardware-backed keystore
@@ -140,6 +152,7 @@ Even if we're subpoenaed, we can only provide:
 - No data backup to iCloud (optional)
 
 ---
-**Privacy isn't a promise. It's an architecture.**
+
+*Privacy isn't a promise. It's an architecture.*
 
 © 2026 YuánGūnGūn & ShadowEdge Team. All rights reserved.
