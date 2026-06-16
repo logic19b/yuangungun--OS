@@ -21,38 +21,37 @@ pod install
 
 # Open workspace
 open YuánGūnGūn.xcworkspace
-
-# Build (Cmd+B) or Run (Cmd+R)
 ```
 
 ## Project Structure
 
 ```
 ios/
-├── YuánGūnGūn/              # Main app target
-│   ├── App/                 # App entry point
-│   ├── Core/                # Biological modules
-│   │   ├── Cardiac/         # Heartbeat
-│   │   ├── Immune/          # Defense
-│   │   ├── Network/         # HTTP layer
-│   │   ├── Crypto/          # Encryption
-│   │   ├── Memory/          # Storage
-│   │   └── Inference/       # Local LLM
-│   ├── Features/            # UI modules
-│   │   ├── Chat/
-│   │   ├── Camera/
-│   │   └── Skills/
-│   └── Resources/          # Assets
-├── YuánGūnGūnKit/           # Framework
-└── Tests/                   # Unit tests
+├── YuánGūnGūn/          # Main app target
+│   ├── App/             # App entry point
+│   ├── Core/            # Biological modules
+│   ├── Cardiace/        # Heartbeat
+│   ├── Immune/          # Defense
+│   ├── Neural/          # Neural network
+│   ├── Crypto/          # Encryption
+│   ├── Memory/          # Storage
+│   ├── Inference/       # Local LLM
+│   ├── Features/        # UI modules
+│   ├── Chat/
+│   ├── Camera/
+│   ├── Skills/
+│   └── Resources/       # Assets
+├── YuánGūnGūnKit/       # Framework
+├── Tests/               # Unit tests
+└── Podfile
 ```
 
 ## Architecture
 
-- **SwiftUI** — Modern declarative UI
-- **Combine** — Reactive programming
-- **CoreML** — On-device inference
-- **Security Framework** — Keychain, encryption
+- **SwiftUI**: Modern declarative UI
+- **Combine**: Reactive programming
+- **CoreML**: On-device inference
+- **Security Framework**: Keychain, encryption
 
 ## Build Config
 
@@ -71,14 +70,14 @@ use_frameworks!
 
 target 'YuánGūnGūn' do
   pod 'SnapKit', '~> 5.6'
-  pod ' Alamofire', '~> 5.8'
+  pod 'Alamofire', '~> 5.8'
   pod 'KeychainAccess', '~> 4.2'
 end
 ```
 
 ## Development
 
-**Run on device**: Connect device → Select target → Run (Cmd+R)
+**Run on device**: Connect device → Select target → Run (⌘R)
 
 **Build for simulator**: Select iPhone simulator → Cmd+R
 
@@ -93,5 +92,4 @@ end
 **Build memory**: Close other apps, increase derived data cleanup frequency
 
 ---
-
 © 2026 YuánGūnGūn & ShadowEdge Team. All rights reserved.
