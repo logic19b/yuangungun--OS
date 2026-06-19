@@ -6,11 +6,11 @@
 
 ## Overview
 
-圆滚滚OS processes all AI inference locally on the device. No user data leaves the device. This document describes the on-device inference stack, model management, and runtime optimization.
+圆滚滚OS processes all AI inference locally on the device. No user data leaves the device without explicit consent. This document describes the on-device inference stack, model management, and runtime optimization.
 
 ## Core Principles
 
-- **Zero cloud dependency** — All models run entirely on-device
+- **Zero cloud dependency** — All models run entirely on-device by default
 - **Progressive loading** — Load models on-demand based on context
 - **Hardware-aware scheduling** — Leverage GPU/NPU when available
 - **Privacy by design** — Raw data never leaves the device boundary
@@ -201,9 +201,9 @@ class MemoryManager {
 ```kotlin
 sealed class MemoryPressure {
     object Low : MemoryPressure()      // Normal operation
-    object Medium : MemoryPressure()    // Pause background tasks
-    object High : MemoryPressure()      // Unload idle models
-    object Critical : MemoryPressure()  // Emergency unloading
+    object Medium : MemoryPressure()   // Pause background tasks
+    object High : MemoryPressure()     // Unload idle models
+    object Critical : MemoryPressure() // Emergency unloading
 }
 ```
 
@@ -229,6 +229,207 @@ class LocalVectorStore(
 ```
 Query → Embed → Search → Context → LLM → Response
 ```
+
+## Streaming Tool Calling
+
+Execute tools mid-generation without interrupting token stream.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│         Token Stream (real-time)             │
+├─────────────────────────────────────────────┤
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐     │
+│  │Token │→ │Token │→ │ <tool_call> │→ │Token │     │
+│  │  A   │  │  B   │  │  detected   │  │  C   │     │
+│  └──────┘  └──────┘  └──────┘  └──────┘     │
+│                          │                   │
+│                          ▼                   │
+│                  ┌───────────────┐          │
+│                  │ Tool Executor │          │
+│                  └───────────────┘          │
+│                          │                   │
+│                          ▼                   │
+│                  ┌───────────────┐          │
+│                  │   Continue    │──────────┘
+│                  │   Generation  │
+│                  └───────────────┘
+```
+
+### Tool Call Interface
+
+```kotlin
+interface ToolExecutor {
+    suspend fun execute(tool: ToolCall): ToolResult
+    fun canHandle(toolName: String): Boolean
+}
+
+class StreamingToolCaller(
+    private val executor: ToolExecutor
+) {
+    suspend fun processWithTools(
+        stream: TokenStream
+    ): Flow<ToolCallEvent> = flow {
+        stream.collect { token ->
+            emit(TokenEvent(token))
+            
+            if (token.isToolCallStart()) {
+                val toolCall = parseToolCall(token)
+                val result = executor.execute(toolCall)
+                emit(ToolResultEvent(toolCall.id, result))
+            }
+        }
+    }
+}
+```
+
+## Edge-Cloud Hybrid Mode
+
+When on-device capability is insufficient, delegate to cloud with privacy-preserving protocols.
+
+### Delegation Decision Tree
+
+```
+User Request
+     │
+     ▼
+┌─────────────────┐
+│ On-Device OK?   │──No──▶ Privacy Check
+└────────┬────────┘         │
+         │Yes               ▼
+         ▼            ┌─────────────────┐
+    Process          │ User Consent?  │──No──▶ Partial Result
+    On-Device        └────────┬────────┘
+                              │Yes
+                              ▼
+                         Delegate to Cloud
+                         (anonymized context)
+```
+
+### Privacy-Preserving Cloud Delegation
+
+```kotlin
+class HybridInferenceGateway(
+    private val localEngine: InferenceEngine,
+    private val cloudClient: CloudInferenceClient
+) {
+    enum class DelegationMode {
+        ON_DEVICE_ONLY,     // Never cloud
+        ON_DEVICE_FIRST,    // Try local, fall back
+        CLOUD_IF_NEEDED,    // User-prompted
+        PRIVILEGED_CLOUD    // Explicit consent
+    }
+    
+    suspend fun infer(
+        request: InferenceRequest,
+        mode: DelegationMode
+    ): InferenceResult {
+        return when (mode) {
+            DelegationMode.ON_DEVICE_ONLY ->
+                localEngine.infer(request)
+                
+            DelegationMode.ON_DEVICE_FIRST ->
+                tryLocalFirst(request)
+                
+            DelegationMode.CLOUD_IF_NEEDED ->
+                if (needsCloud(request)) {
+                    requireConsent(request)
+                    anonymizeAndDelegate(request)
+                } else {
+                    localEngine.infer(request)
+                }
+                
+            DelegationMode.PRIVILEGED_CLOUD ->
+                anonymizeAndDelegate(request)
+        }
+    }
+    
+    private fun anonymizeAndDelegate(
+        request: InferenceRequest
+    ): InferenceResult {
+        val anonymized = request.stripPII()
+        val sessionId = generateBlindSessionId()
+        return cloudClient.infer(anonymized, sessionId)
+    }
+}
+```
+
+### What Never Leaves the Device
+
+| Data Category | On-Device | Cloud (Anonymized) |
+|---------------|-----------|-------------------|
+| Conversation history | ✅ | ❌ |
+| User preferences | ✅ | ❌ |
+| Task context | ✅ | Stripped |
+| General knowledge queries | ✅ | ✅ |
+| Model weights | ✅ | ❌ |
+
+## Power & Thermal Management
+
+Optimize inference for battery life and thermal constraints.
+
+### Power Modes
+
+```kotlin
+enum class PowerMode {
+    MAX_PERFORMANCE,  // Full GPU/NPU, fastest inference
+    BALANCED,         // Dynamic frequency scaling
+    POWER_SAVER,      // CPU only, reduced quality
+    THERMAL_THROTTLE  // Emergency mode when hot
+}
+
+class PowerManager {
+    private var currentMode = PowerMode.BALANCED
+    
+    fun adjustForThermal(tempCelsius: Float) {
+        currentMode = when {
+            tempCelsius > 45 -> PowerMode.THERMAL_THROTTLE
+            tempCelsius > 40 -> PowerMode.POWER_SAVER
+            tempCelsius > 35 -> PowerMode.BALANCED
+            else -> PowerMode.MAX_PERFORMANCE
+        }
+    }
+    
+    fun getInferenceConfig(): InferenceConfig {
+        return when (currentMode) {
+            PowerMode.MAX_PERFORMANCE -> InferenceConfig(
+                useNpu = true,
+                threads = Runtime.getRuntime().availableProcessors(),
+                batchSize = 32,
+                quality = Quality.HIGH
+            )
+            PowerMode.BALANCED -> InferenceConfig(
+                useNpu = true,
+                threads = 4,
+                batchSize = 16,
+                quality = Quality.MEDIUM
+            )
+            PowerMode.POWER_SAVER -> InferenceConfig(
+                useNpu = false,
+                threads = 2,
+                batchSize = 4,
+                quality = Quality.LOW
+            )
+            PowerMode.THERMAL_THROTTLE -> InferenceConfig(
+                useNpu = false,
+                threads = 1,
+                batchSize = 1,
+                quality = Quality.MINIMAL
+            )
+        }
+    }
+}
+```
+
+### Battery Impact Estimates
+
+| Task Type | Duration | Battery Drain |
+|-----------|----------|---------------|
+| Chat response (INT4) | ~10s | 1-2% |
+| Code generation | ~30s | 3-5% |
+| Long document analysis | ~2min | 8-12% |
+| RAG with large context | ~5min | 15-20% |
 
 ## Security Model
 
