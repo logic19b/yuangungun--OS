@@ -41,7 +41,7 @@ Network requests only for:
 All traffic: HTTPS + certificate pinning + encrypted keys.
 
 ### The Immune System
-- **Monitors outputs** for sensitive patterns
+- **Monitors output** for sensitive patterns
 - **Blocks data extraction attempts**
 - **Isolates suspicious interactions**
 
@@ -76,10 +76,10 @@ All traffic: HTTPS + certificate pinning + encrypted keys.
 YuánGūnGūn OS requests only what's necessary:
 
 | Permission | Why | Can be denied |
-|------------|-----|---------------|
-| Microphone | Voice input | Yes — text-only mode works |
-| Storage | Save memories | Yes — ephemeral mode available |
-| Network | Cloud fallback | Yes — fully offline mode |
+|-----------|-----|---------------|
+| Microphone | Voice input | Yes – text-only mode works |
+| Storage | Save memories | Yes – ephemeral mode available |
+| Network | Cloud fallback | Yes – fully offline mode |
 
 ### No Hidden Permissions
 - No contacts access
@@ -125,10 +125,64 @@ Even if we're subpoenaed, we can only provide:
 
 ---
 
+## Data Residency
+
+### Where Your Data Lives
+
+| Data Type | Location | Encryption |
+|-----------|----------|------------|
+| Conversations | Device only | AES-256-GCM |
+| Memory | Device + Optional cloud backup | User-controlled key |
+| Preferences | Device | EncryptedSharedPreferences |
+| Model cache | Device | N/A (public model) |
+
+### Geographic Control
+- **Default**: All data stays on device
+- **Optional backup**: User chooses cloud provider
+- **No forced data center routing**
+
+---
+
+## Third-Party Audit
+
+### Independent Verification
+YuánGūnGūn OS undergoes regular security audits:
+
+| Audit Type | Frequency | Scope |
+|------------|-----------|-------|
+| Code review | Quarterly | Full codebase |
+| Penetration testing | Bi-annual | All attack surfaces |
+| Dependency scan | Monthly | Third-party libraries |
+| Privacy impact | Annual | Data flow analysis |
+
+### Audit Reports
+Available at: `docs/security/audits/`
+
+---
+
+## Compliance Framework
+
+### Standards Met
+
+| Standard | Status | Scope |
+|----------|--------|-------|
+| GDPR | Compliant | EU users |
+| CCPA | Compliant | California users |
+| COPPA | Compliant | Children's data |
+| ISO 27001 | In progress | Security management |
+
+### Key Compliance Features
+- Right to erasure (Article 17)
+- Data portability (Article 20)
+- Breach notification (Article 33)
+- Privacy by design (Article 25)
+
+---
+
 ## Cloud AI vs YuánGūnGūn OS
 
 | | Cloud AI | YuánGūnGūn OS |
-|--|---------|--------------|
+|-|----------|---------------|
 | Chat history | Server-side | Device-only |
 | Model training | Your data may be used | Never |
 | Encryption keys | Company holds | You hold |
@@ -140,7 +194,7 @@ Even if we're subpoenaed, we can only provide:
 ## Security Hardening
 
 ### Android
-- SafetyNet / Play Integrity API
+- SafeNet / Play Integrity API
 - Hardware-backed keystore
 - Scoped storage isolation
 - No signature permissions
@@ -150,6 +204,28 @@ Even if we're subpoenaed, we can only provide:
 - Keychain data protection class: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 - App Transport Security enforced
 - No data backup to iCloud (optional)
+
+---
+
+## Extended Capabilities & Privacy
+
+### On-Device Learning
+- User patterns stored locally
+- Model fine-tuning: On-device only
+- No learning data leaves device
+- Forget learned patterns on demand
+
+### Cross-Device Sync
+- End-to-end encrypted sync
+- User controls encryption keys
+- No plaintext on servers
+- Sync can be disabled entirely
+
+### Developer Features
+- Local API testing
+- Debug logs: On-device only
+- No telemetry from dev mode
+- Sandbox execution
 
 ---
 
