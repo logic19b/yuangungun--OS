@@ -245,6 +245,181 @@ Damage Detected:
 
 ---
 
+## System Interactions — Cell Signaling
+
+### Signaling Pathways
+
+Biological systems communicate through well-defined signaling mechanisms:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    SIGNAL TRANSDUCTION                    │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  Immune ──→ Cortisol ──→ Nervous (stress response)      │
+│     ↓                                                    │
+│  Memory (threat pattern storage)                         │
+│                                                          │
+│  Nervous ──→ Acetylcholine ──→ Muscular (task trigger)  │
+│     ↓                                                    │
+│  Circulatory (resource allocation)                      │
+│                                                          │
+│  Digestive ──→ Insulin ──→ Memory (skill integration)   │
+│     ↓                                                    │
+│  Long-term storage priority boost                        │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Hormonal Regulation
+
+| Hormone | Origin | Target | Effect |
+|---------|--------|--------|--------|
+| Cortisol | Immune | Nervous | Alert mode, enhanced pattern detection |
+| Adrenaline | Circulatory | Muscular | Burst processing, fast execution |
+| Oxytocin | Memory | Nervous | Trust signals, preference weighting |
+| Dopamine | Nervous | Integumentary | Reward-based self-modification |
+
+### Feedback Loops
+
+```kotlin
+class SignalTransducer {
+    // Negative feedback: Prevent over-stimulation
+    fun inhibit(source: System, target: System, signal: Signal) {
+        val currentLevel = signal.magnitude
+        if (currentLevel > THRESHOLD) {
+            target.receive(signal.copy(magnitude = currentLevel * 0.7))
+            source.produce(Feedback(signal, isInhibited = true))
+        }
+    }
+    
+    // Positive feedback: Amplify critical signals
+    fun amplify(source: System, target: System, signal: Signal) {
+        if (signal.priority == Priority.CRITICAL) {
+            target.receive(signal.copy(magnitude = signal.magnitude * 1.5))
+            publish(Alert(source, "Critical signal amplified"))
+        }
+    }
+}
+```
+
+---
+
+## Neuroendocrine Integration
+
+### Stress Response Cascade
+
+```
+Perceived Threat (Input Anomaly)
+          ↓
+    Hypothalamus
+          ↓
+    Pituitary (releases ACTH)
+          ↓
+    Adrenal Cortex (releases Cortisol)
+          ↓
+    ┌─────────────────────────────────┐
+    │  Immune:  Enhanced vigilance   │
+    │  Memory:  Fast pattern storage  │
+    │  Nervous: Threat prioritization │
+    │  Integumentary: Lock modifications │
+    └─────────────────────────────────┘
+          ↓
+    Recovery: 30-minute cool-down cycle
+```
+
+### Vagus Nerve — Rest-and-Digest
+
+```
+User Idle State Detected
+          ↓
+    Vagus Stimulation
+          ↓
+    ┌─────────────────────────────────┐
+    │  Immune:  Reduced activity      │
+    │  Memory:  Consolidation phase  │
+    │  Circulatory: Bandwidth reduction│
+    │  Integumentary: Safe self-mod   │
+    └─────────────────────────────────┘
+```
+
+### Implementation
+
+```kotlin
+class NeuroendocrineController {
+    
+    fun processSignal(input: SystemSignal): NeuroResponse {
+        return when (input.type) {
+            SignalType.THREAT -> activateStressResponse(input)
+            SignalType.IDLE -> activateRestResponse(input)
+            SignalType.REWARD -> activateLearningMode(input)
+            SignalType.REPETITION -> strengthenPathway(input)
+        }
+    }
+    
+    private fun activateStressResponse(signal: SystemSignal): NeuroResponse {
+        return NeuroResponse(
+            immuneBoost = 2.0,
+            memoryPriority = Priority.HIGH,
+            modificationLock = true,
+            cooldownPeriod = 30.seconds
+        )
+    }
+    
+    private fun activateRestResponse(signal: SystemSignal): NeuroResponse {
+        return NeuroResponse(
+            immuneBoost = 0.5,
+            memoryConsolidation = true,
+            modificationLock = false,
+            maintenanceMode = true
+        )
+    }
+}
+```
+
+---
+
+## Autonomic Regulation
+
+### Sympathetic (Active Mode)
+
+| System | State | Duration |
+|--------|-------|----------|
+| Nervous | Peak inference | Until task complete |
+| Circulatory | High bandwidth | Active session |
+| Immune | High alert | Threat detection |
+| Muscular | Ready state | Always |
+
+### Parasympathetic (Idle Mode)
+
+| System | State | Duration |
+|--------|-------|----------|
+| Nervous | Ambient monitoring | Continuous |
+| Circulatory | Low bandwidth | User absence |
+| Immune | Baseline patrol | Continuous |
+| Muscular | Power save | User absence |
+
+### Transition Logic
+
+```python
+class AutonomicRegulation:
+    def determine_state(self, metrics: SystemMetrics) -> SystemState:
+        user_activity = metrics.active_sessions
+        threat_level = metrics.current_threats
+        resource_pressure = metrics.cpu_usage
+        
+        if threat_level > HIGH:
+            return SystemState.SYMpathetic_PEAK
+        elif user_activity > 0:
+            return SystemState.SYMpathetic_NORMAL
+        elif resource_pressure > IDLE_THRESHOLD:
+            return SystemState.PARASYMPATHETIC_TRANSITION
+        else:
+            return SystemState.PARASYMPATHETIC_REST
+```
+
+---
+
 ## Module Hierarchy
 
 ```
@@ -256,7 +431,8 @@ yuangungun-OS/
 │   ├── inference/     # Nervous: AI core
 │   ├── memory/        # Memory: Persistence
 │   ├── dynamic/       # Integumentary: Self-mod
-│   └── recovery/      # Healing: Resilience
+│   ├── recovery/      # Healing: Resilience
+│   └── neuro/         # Neuroendocrine: Regulation
 ├── skills/           # Digestive: Capabilities
 └── runtime/          # Environment
 ```
@@ -270,6 +446,7 @@ yuangungun-OS/
 3. **Self-improving**: Gradual optimization through usage patterns
 4. **Resource-aware**: Adaptive quality based on device constraints
 5. **Biologically Inspired**: Resilient, adaptive, evolutionary
+6. **Systemically Coordinated**: All systems communicate via defined signaling pathways
 
 ---
 
@@ -285,12 +462,75 @@ yuangungun-OS/
 | 14:00–22:00 | Active | Extended inference, learning |
 | 22:00–24:00 | Wind Down | State persistence, preparation |
 
+### Ultradian Rhythms (90-min cycles)
+
+```
+Active Phase (90 min):
+  0-60min:  Peak performance
+  60-75min: Gradual resource decline
+  75-90min: Rest mini-cycle
+  
+Implementation:
+  - Checkpoint every 60min
+  - Memory flush at 75min
+  - Parasympathetic micro-burst at 90min
+```
+
 ### Metabolics
 
 - **Basal**: ~5% CPU baseline (idle monitoring)
 - **Active**: 20–80% CPU (user interaction)
 - **Peak**: 100% CPU (complex reasoning)
 - **Recovery**: <10% CPU (post-task cleanup)
+
+---
+
+## Reference Implementation
+
+### Core Signaling Interface
+
+```kotlin
+interface BiologicalSignaling {
+    // Send signal between systems
+    suspend fun emit(from: System, to: System, signal: Signal)
+    
+    // Receive and process incoming signals
+    suspend fun receive(system: System): Signal
+    
+    // Register for specific signal types
+    fun subscribe(system: System, signalTypes: List<SignalType>)
+    
+    // Unsubscribe from signals
+    fun unsubscribe(system: System, signalTypes: List<SignalType>)
+}
+```
+
+### Signal Types Enum
+
+```kotlin
+enum class SignalType {
+    // Nervous system signals
+    INFERENCE_REQUEST, INFERENCE_COMPLETE, THOUGHT_PROCESSED,
+    
+    // Circulatory signals
+    DATA_FLOW_START, DATA_FLOW_STOP, BANDWIDTH_ALERT,
+    
+    // Immune signals
+    THREAT_DETECTED, THREAT_NEUTRALIZED, ANOMALY_FLAG,
+    
+    // Memory signals
+    STORE_REQUEST, RECALL_REQUEST, CONSOLIDATION_TRIGGER,
+    
+    // Neuroendocrine signals
+    STRESS_SIGNAL, REST_SIGNAL, REWARD_SIGNAL,
+    
+    // Muscular signals
+    EXECUTE_TASK, TASK_COMPLETE, TASK_FAILED,
+    
+    // Integumentary signals
+    MODIFY_REQUEST, HEAL_TRIGGER, GROW_SIGNAL
+}
+```
 
 ---
 
