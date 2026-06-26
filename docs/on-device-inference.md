@@ -170,6 +170,80 @@ data class ModelVersion(
 )
 ```
 
+
+### LoRA Adapter Hub
+
+Lightweight Low-Rank Adaptation (LoRA) adapters enable task-specialized behavior without downloading full models. Each adapter is typically 5-50 MB and composes with the base model at inference time.
+
+#### Adapter Categories
+
+| Category | Size | Use Case |
+|----------|------|----------|
+| **Code Expert** | ~40 MB | Programming, debugging, code review |
+| **Security Analyst** | ~35 MB | Threat detection, vulnerability analysis |
+| **Creative Writer** | ~25 MB | Content generation, storytelling |
+| **Translation** | ~30 MB | Multilingual translation & localization |
+| **Math & Reasoning** | ~45 MB | Complex problem solving, logical deduction |
+
+#### Adapter Routing
+
+The router selects the optimal adapter based on task classification:
+
+```kotlin
+class LoRAAdapterHub(
+    private val baseModel: InferenceModel,
+    private val adapterDir: String
+) {
+    private val activeAdapters = mutableMapOf<String, LoRAAdapter>()
+    private val router = TaskClassifier()
+
+    suspend fun inferWithAdapter(
+        prompt: String,
+        context: AgentContext
+    ): InferenceResult {
+        val taskType = router.classify(prompt)
+        val adapter = getOrLoadAdapter(taskType)
+        
+        return baseModel.infer(
+            prompt = prompt,
+            adapterWeights = adapter?.weights,
+            adapterAlpha = adapter?.alpha ?: 1.0f
+        )
+    }
+
+    private suspend fun getOrLoadAdapter(taskType: TaskType): LoRAAdapter? {
+        activeAdapters[taskType.id]?.let { return it }
+        
+        val adapterPath = "$adapterDir/${taskType.id}.lora"
+        if (!File(adapterPath).exists()) return null
+        
+        val adapter = LoRAAdapterLoader.load(adapterPath)
+        activeAdapters[taskType.id] = adapter
+        return adapter
+    }
+
+    fun availableAdapters(): List<AdapterInfo> =
+        File(adapterDir).listFiles { _, name -> name.endsWith(".lora") }
+            ?.map { AdapterInfo.fromFile(it) }
+            ?: emptyList()
+}
+```
+
+#### Composable Adapters
+
+Multiple adapters can be composed for hybrid tasks (e.g., code + security for vulnerability analysis):
+
+```kotlin
+suspend fun composeInference(
+    prompt: String,
+    adapterIds: List<String>,
+    weights: List<Float>
+): InferenceResult {
+    val composedWeights = adapterIds.zip(weights).associate { it }
+    return baseModel.infer(prompt, composedAdapters = composedWeights)
+}
+```
+
 ## Memory Management
 
 ### Streaming Inference
@@ -206,6 +280,143 @@ sealed class MemoryPressure {
     object Critical : MemoryPressure() // Emergency unloading
 }
 ```
+
+
+## On-Device Fine-tuning Pipeline
+
+Enable lightweight model adaptation directly on the device using federated learning principles. No raw data ever leaves the device — only lightweight adapter deltas are shared (with explicit consent).
+
+### Fine-tuning Capabilities
+
+| Capability | Method | Data Required | Duration |
+|------------|--------|---------------|----------|
+| **Vocabulary adaptation** | Embedding fine-tune | 100+ samples | ~2 min |
+| **Style alignment** | LoRA rank-8 | 500+ samples | ~10 min |
+| **Task specialization** | LoRA rank-16 | 2000+ samples | ~30 min |
+| **Domain expert** | Full adapter | 10000+ samples | ~2 hr |
+
+### Training Pipeline
+
+```
+User Interactions → Dataset Curation → LoRA Training → Evaluation → Adapter Deploy
+         ↓              ↓                ↓              ↓             ↓
+    auto-collect   quality filtering   quantized     benchmark     hot-swap
+                   privacy scrub       gradient                    without restart
+```
+
+### Dataset Curation
+
+```kotlin
+class FineTuningDatasetManager(
+    private val maxSamples: Int = 5000,
+    private val qualityThreshold: Float = 0.8f
+) {
+    data class TrainingSample(
+        val input: String,
+        val output: String,
+        val qualityScore: Float,
+        val source: SampleSource,
+        val timestamp: Long
+    )
+
+    suspend fun addSample(sample: TrainingSample) {
+        if (sample.qualityScore < qualityThreshold) return
+        
+        val scrubbed = scrubPii(sample)
+        val deduplicated = deduplicate(scrubbed)
+        
+        trainingSamples.add(deduplicated)
+        if (trainingSamples.size > maxSamples) {
+            evictLowestQuality()
+        }
+    }
+
+    private fun scrubPii(sample: TrainingSample): TrainingSample {
+        val scrubbedInput = piiScrubber.scrub(sample.input)
+        val scrubbedOutput = piiScrubber.scrub(sample.output)
+        return sample.copy(input = scrubbedInput, output = scrubbedOutput)
+    }
+
+    suspend fun buildTrainingSet(size: Int): List<TrainingSample> {
+        return trainingSamples
+            .sortedByDescending { it.qualityScore }
+            .take(size)
+    }
+}
+```
+
+### Adapter Training Engine
+
+```kotlin
+class OnDeviceTrainer(
+    private val baseModel: InferenceModel,
+    private val config: TrainingConfig
+) {
+    data class TrainingConfig(
+        val rank: Int = 8,
+        val alpha: Float = 16f,
+        val learningRate: Float = 1e-4f,
+        val epochs: Int = 3,
+        val batchSize: Int = 2,
+        val maxDurationMinutes: Int = 30
+    )
+
+    sealed class TrainingState {
+        data object Idle : TrainingState()
+        data class Running(val epoch: Int, val loss: Float, val progress: Float) : TrainingState()
+        data class Completed(val adapterPath: String, val evalScore: Float) : TrainingState()
+        data class Failed(val reason: String) : TrainingState()
+    }
+
+    suspend fun trainAdapter(
+        dataset: List<TrainingSample>,
+        adapterName: String,
+        onProgress: (TrainingState) -> Unit
+    ): TrainingState {
+        // Check prerequisites: charging + WiFi + idle thermal state
+        if (!canTrainNow()) {
+            return TrainingState.Failed("Device not ready for training")
+        }
+
+        var currentEpoch = 0
+        var bestLoss = Float.MAX_VALUE
+        
+        for (epoch in 0 until config.epochs) {
+            currentEpoch = epoch
+            val epochLoss = runEpoch(dataset.shuffled(), epoch)
+            
+            if (epochLoss < bestLoss) {
+                bestLoss = epochLoss
+                saveCheckpoint(adapterName, epoch)
+            }
+            
+            onProgress(TrainingState.Running(epoch, epochLoss, 
+                (epoch + 1f) / config.epochs))
+            
+            if (thermalManager.isOverheating()) break
+        }
+
+        val evalScore = evaluateAdapter(adapterName, dataset.takeLast(100))
+        val finalPath = finalizeAdapter(adapterName)
+        
+        return TrainingState.Completed(finalPath, evalScore)
+    }
+
+    private fun canTrainNow(): Boolean {
+        return batteryManager.isCharging() &&
+               thermalManager.currentTemp() < 35f &&
+               connectivityManager.isOnWifi()
+    }
+}
+```
+
+### Training Constraints
+
+- **Charging only** — Training only runs while the device is charging
+- **Thermal throttle** — Pauses automatically if device temperature exceeds 38°C
+- **WiFi required** — Adapter downloads/uploads only over WiFi (user-configurable)
+- **Idle preference** — Scheduled during device idle windows (typically 2-6 AM)
+- **Resource budget** — Maximum 20% CPU / 30% GPU utilization during training
 
 ## Local RAG Integration
 
