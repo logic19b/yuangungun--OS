@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://img.shields.io/badge/License-BSL%201.1-blue.svg">
+  <a href="#">
     <img src="https://img.shields.io/badge/License-BSL%201.1-blue.svg" alt="License">
   </a>
   <a href="#">
@@ -23,6 +23,9 @@
   </a>
   <a href="#">
     <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen.svg" alt="PRs Welcome">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/Release-v0.3.0--alpha-orange.svg" alt="Release">
   </a>
 </p>
 
@@ -56,6 +59,18 @@ This one has a heartbeat.
 
 ## Current Status
 
+### 🚀 v0.3.0-alpha — Releasing Tomorrow (2026-06-28)
+The first public milestone. On-device. Private. Alive.
+
+- ✅ **Identity Persistence Protocol (YIP v1)** — Export, import, mnemonic recovery
+- ✅ **Memory Chain** — Append-only encrypted memory with chain verification
+- ✅ **ModuleRegistry + EventBus** — Decoupled module communication
+- ✅ **Immune System** — Prompt injection defense with adaptive learning
+- ✅ **On-Device Inference** — MNN + LiteRT + Core ML + ONNX Runtime
+- ✅ **LoRA Adapter Hub** — 5 task-specific adapters with composability
+- ✅ **On-Device Fine-tuning** — Battery/network/thermal-aware training pipeline
+- ✅ **CI/CD Pipeline** — GitHub Actions for Android & iOS
+
 ### ✅ Core Systems Online
 - **Cardiac** — Heartbeat module with pulse-based consciousness
 - **Immune** — Prompt injection shield (prompt defense prompt active)
@@ -72,18 +87,33 @@ This one has a heartbeat.
 - **v1.0 Core** — 10 biological systems implemented
 - **On-Device Inference** — MNN + LiteRT + Core ML + ONNX Runtime support
 - **Dynamic Skills** — Rhino JS module loader with self-authored capabilities
+- **LoRA Adapter Hub** — 5 task-specific adapters (Code / Security / Creative / Translation / Math)
+- **On-Device Fine-tuning** — 4-tier training (vocab/style/task/domain) with safety guards
+- **Immune System** — Adaptive threat detection with attack-pattern learning
+- **Identity & Memory** — YIP v1 protocol + encrypted memory chain
 - **Security** — Certificate pinning, AES-256 encryption, hardware root of trust
 - **GitHub Active** — Daily content rotation: docs, examples, architecture
 
+### 📅 Roadmap
+| Milestone | Date | Status |
+|-----------|------|--------|
+| 🐣 v0.3.0-alpha | 2026-06-28 | 🟢 Finalizing |
+| 🐥 v0.4.0-alpha | 2026-08-09 | 📋 Planned |
+| 🐤 v0.5.0-beta | 2026-10-04 | 📋 Planned |
+| 🐔 v0.7.0-beta | 2026-11-29 | 📋 Planned |
+| 🦅 v1.0.0 | 2027-01-17 | 📋 Planned |
+
 ### 🚀 Recent Milestones
+- **2026-06-26** — LoRA Adapter Hub & on-device fine-tuning pipeline added to on-device inference docs
+- **2026-06-25** — InferenceModule merged; iOS SkillPlugin example published
+- **2026-06-24** — Immune system documentation released (prompt injection defense architecture)
+- **2026-06-23** — Android development environment setup guide complete
+- **2026-06-22** — System architecture extended with cell signaling, neuroendocrine integration, and ultradian rhythms
 - **2026-06-20** — README status refresh; daily GitHub update cadence maintained
 - **2026-06-19** — 算账助手 v2.3.3 final stable release with Inno Setup packaging (27.8MB, x86/x64/ARM64 support)
 - **2026-06-19** — WeChat integration migrated to wechat-decrypt + OCR dual-scheme architecture (ABI compatibility resolved)
 - **2026-06-13** — README status refresh; daily GitHub update cadence established
 - **2026-06-06** — On-device inference architecture documentation complete
-- **2026-06-05** — Security audit framework deployed (21-day log rotation)
-- **2026-06-04** — GitHub repository initialized with full documentation
-- **2026-06-02** — X-OmniClaw global expansion launched
 
 ---
 
@@ -112,9 +142,10 @@ This one has a heartbeat.
 
 - **Android** — Kotlin, Hilt, Jetpack Compose, CameraX, MNN + LiteRT
 - **iOS** — KMP shared core, SwiftUI, Shortcuts automation
-- **Inference** — On-device LLM (MNN) + lightweight cloud fallback
-- **Security** — Certificate pinning, encrypted storage, immune system
+- **Inference** — On-device LLM (MNN) + LoRA adapters + lightweight cloud fallback
+- **Security** — Certificate pinning, AES-256 encryption, hardware root of trust
 - **Skills** — Dynamic module loading (DexClassLoader), self-authored abilities
+- **Build** — GitHub Actions CI/CD for Android & iOS
 
 ---
 
@@ -187,8 +218,6 @@ See [LICENSE](LICENSE) for details.
 - 📧 **Email:** yuangungun-hack@coze.email
 - 🐛 **Issues:** [GitHub Issues](https://github.com/logic19b/yuangungun--OS/issues)
 - 💬 **Discussions:** [GitHub Discussions](https://github.com/logic19b/yuangungun--OS/discussions)
-
----
 
 <p align="center">
   <strong>Give AI a heartbeat.</strong><br>
