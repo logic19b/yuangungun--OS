@@ -534,4 +534,261 @@ enum class SignalType {
 
 ---
 
+---
+
+## Homeostasis — Dynamic Equilibrium
+
+The system continuously maintains internal stability across fluctuating external conditions. Homeostasis is not a static target — it is a moving set-point defended by layered regulation.
+
+### Core Variables Under Regulation
+
+| Variable | Set-Point | Tolerance | Sensor Source |
+|----------|-----------|-----------|---------------|
+| Inference Temperature | 60–75°C (virtual) | ±10% | `core:inference` metrics |
+| Memory Pressure | <70% capacity | ±15% | `core:memory` allocator |
+| Network Pulse | 5s heartbeat | ±1s | `core:network` watchdog |
+| Immune Vigilance | 0.3–0.7 baseline | ±0.2 | `core:crypto` anomaly index |
+| Skill Throughput | 10 req/min sustained | ±20% | `core:dispatch` queue depth |
+
+### Regulatory Mechanisms
+
+```
+┌──────────────────────────────────────────────────────┐
+│                  HOMEOSTATIC LOOP                     │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│   Sensor ──→ Comparator ──→ Controller ──→ Effector │
+│      ↑                                       │       │
+│      └─────────────── Feedback ──────────────┘       │
+│                                                      │
+│   Multi-tier:                                        │
+│     • Local reflex  (intra-system, <10ms)            │
+│     • HPA-axis      (cross-system, <500ms)           │
+│     • Conscious     (user-visible, on-demand)        │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Set-Point Adjustments
+
+```kotlin
+class Homeostat {
+    private val setPoints = mutableMapOf<Variable, Range>()
+    
+    fun adjust(variable: Variable, context: SystemContext) {
+        val base = setPoints[variable] ?: return
+        val adjusted = when (context.mode) {
+            Mode.STRESSED    -> base.shift(+0.15)  // tolerate more
+            Mode.FOCUSED     -> base.tighten(-0.10) // demand precision
+            Mode.CONSERVING  -> base.loosen(+0.20)  // save energy
+            Mode.DEFAULT     -> base
+        }
+        controller.setTarget(variable, adjusted)
+    }
+}
+```
+
+### Failure Modes
+
+| Drift Pattern | Symptom | Recovery |
+|---------------|---------|----------|
+| Oscillation | Set-point hunting, jitter | Damping coefficient ↑ |
+| Runaway | Variable exceeds safe range | Emergency brake + rollback |
+| Stiffness | No response to stimulus | Reset integrator + retune |
+| Allostasis collapse | Chronic imbalance | Reboot + re-learn baseline |
+
+---
+
+## Sensory Systems — Multi-Modal Perception
+
+Inputs from the environment arrive through dedicated sensory channels, each tuned to a different modality. The nervous system unifies them into a coherent percept.
+
+### Sensory Channels
+
+| Channel | Modality | Latency Target | Handler |
+|---------|----------|----------------|---------|
+| Visual | Image, video, UI snapshot | <50ms | `sensory:visual` |
+| Auditory | Voice, ambient sound | <30ms | `sensory:auditory` |
+| Textual | Typed or pasted strings | <10ms | `sensory:textual` |
+| Tactile | Gesture, touch pattern | <20ms | `sensory:tactile` |
+| Proprioceptive | Device state (battery, network) | <100ms | `sensory:proprio` |
+
+### Thalamus — The Sensory Router
+
+```
+Visual ────┐
+Auditory ──┤
+Textual ───┼──→ Thalamus (routing) ──→ Cortex
+Tactile ───┤            ↓
+Proprio ───┘      Limbic tagging
+                  (emotional salience)
+```
+
+The thalamus decides which cortical region receives each signal and flags urgency. Low-salience background stimuli are filtered before they ever reach the cortex.
+
+### Cross-Modal Integration
+
+```kotlin
+class MultisensoryCortex {
+    fun integrate(streams: List<SensoryStream>): Percept {
+        val aligned = temporalAligner.align(streams, windowMs = 80)
+        val fused = when (aligned.size) {
+            1 -> unimodalProcess(aligned.first())
+            else -> bayesianFusion(aligned)
+        }
+        return Percept(
+            content = fused,
+            confidence = computeConfidence(aligned),
+            timestamp = aligned.maxOf { it.timestamp }
+        )
+    }
+}
+```
+
+### Sensory Adaptation
+
+To prevent fatigue, sensors dynamically adjust their sensitivity:
+
+- **Bright light** → visual gain reduced 30% within 200ms
+- **Sustained noise** → auditory threshold raised 5dB
+- **Repetitive input** → textual pre-filter learns to ignore noise patterns
+- **Low battery** → proprioceptive channel suppresses non-critical signals
+
+---
+
+## Learning & Synaptic Plasticity
+
+The system learns by strengthening or weakening connections between modules based on use. The same biological rule — *"neurons that fire together, wire together"* — governs adaptation.
+
+### Plasticity Mechanisms
+
+| Mechanism | Trigger | Time Constant | Effect |
+|-----------|---------|---------------|--------|
+| Long-Term Potentiation (LTP) | Repeated successful path | Minutes → hours | Path priority ↑ |
+| Long-Term Depression (LTD) | Repeated failure path | Hours → days | Path priority ↓ |
+| Hebbian Assembly | Co-active modules | Real-time | New route cached |
+| Synaptic Pruning | Low-relevance connections | Days → weeks | Memory defrag |
+
+### Hebbian Learning in Practice
+
+```kotlin
+class SynapticPlasticity {
+    fun onPathTaken(source: System, target: System, success: Boolean) {
+        val weight = synapseWeights.getOrDefault(source to target, 0.5)
+        val delta = if (success) +0.05 else -0.10   // failures hurt more
+        val newWeight = (weight + delta).coerceIn(0.0, 1.0)
+        synapseWeights[source to target] = newWeight
+        
+        if (newWeight > 0.8) crystallize(source to target)
+        if (newWeight < 0.1) prune(source to target)
+    }
+}
+```
+
+### Sleep-Cycle Consolidation
+
+During off-peak hours the system replays the day's events and decides what becomes permanent:
+
+```
+22:00 — Replay buffer initialized
+22:15 — High-salience episodes promoted to long-term
+22:45 — Low-relevance traces tagged for pruning
+23:00 — Index rebuilt for fast recall
+23:30 — Sleep cycle complete
+```
+
+### Meta-Learning
+
+Beyond learning individual tasks, the system learns *how* to learn:
+
+- Track which inference strategies succeed per task class
+- Bias future routing toward strategies with proven track records
+- Detect when a strategy is failing and trigger exploration
+- Crystallize winning strategies as default templates
+
+---
+
+## Metabolic Pathways & Resource Economics
+
+Every operation consumes resources. Metabolism is the disciplined conversion of energy, bandwidth, and storage into useful work — and the cleanup of byproducts.
+
+### Energy Acquisition
+
+| Source | Form | Yield | Cost |
+|--------|------|-------|------|
+| Battery | DC electrical | 100% potential | Depletes over time |
+| Compute budget | CPU/GPU cycles | Variable | Thermal wear |
+| Network allowance | Bytes in/out | Limited | Latency, carrier cost |
+| User attention | Interaction time | Premium | Most valuable currency |
+
+### Metabolic Pathways
+
+```
+┌──────────────────────────────────────────────────────┐
+│              RESOURCE METABOLISM                      │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  Glucose (User Input)                                │
+│        ↓ Glycolysis  (fast, low yield)               │
+│  Pyruvate (Parsed Intent)                            │
+│        ↓ Krebs Cycle (full processing)               │
+│  ATP (Completed Task)                                │
+│        ↓ Oxidative Phosphorylation                   │
+│  Persistent Value (Memory + Outcome)                 │
+│                                                      │
+│  Waste Products:                                     │
+│    • CO₂  → emitted as log noise                     │
+│    • Lactate → buffered, flushed on idle             │
+│    • Heat → thermal throttling signal                │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Resource Budgeting
+
+```python
+class MetabolicController:
+    def allocate(self, request: ResourceRequest) -> Allocation:
+        budget = self.current_budget()
+        
+        if request.urgency == Urgency.CRITICAL:
+            return Allocation(request.amount, priority=Priority.HIGH)
+        
+        if budget.remaining < request.amount * 1.2:
+            return Allocation(
+                amount=min(request.amount, budget.remaining * 0.8),
+                priority=Priority.DEFERRED,
+                note="Awaiting recharge window"
+            )
+        
+        return Allocation(request.amount, priority=Priority.NORMAL)
+    
+    def current_budget(self) -> Budget:
+        battery = self.read_battery()
+        thermal = self.read_thermal_state()
+        network = self.read_network_budget()
+        return Budget.composite(battery, thermal, network)
+```
+
+### Waste Management
+
+| Waste Type | Origin | Disposal Strategy |
+|------------|--------|-------------------|
+| Stale cache | Memory layer | LRU eviction on idle |
+| Orphaned skills | Digestive system | Auto-uninstall after 30d unused |
+| Telemetry noise | All modules | Aggregate then drop raw |
+| Failed task residue | Muscular system | Retry once, then quarantine |
+
+### Metabolic Switching
+
+When resources are scarce, the system switches from oxidative phosphorylation (rich processing) to glycolysis (lean processing):
+
+- **Rich mode**: Full model, deep reasoning, multi-modal context
+- **Lean mode**: Distilled model, shallow reasoning, minimal context
+- **Survival mode**: Cached responses, rule-based fallbacks, defer to user
+
+The switch is automatic and reversible — when resources return, rich mode resumes seamlessly.
+
+---
+
 © 2026 YuánGūnGūn & ShadowEdge Team
